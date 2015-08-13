@@ -1,0 +1,140 @@
+
+#vmenu {
+
+  background-color: $sitnet-light-grey;
+  color: $sitnet-dark-grey;
+  top: 79px; // HY CUSTOMIZATION
+  left: 0;
+  bottom: 0;
+  z-index: 331;
+  padding: 0;
+  position: fixed;
+  overflow: auto;
+  i {
+    vertical-align: middle;
+  }
+
+  a {
+    color: $sitnet-dark-grey;
+  }
+
+  .logo {
+    padding: 0;
+    width: 100%;
+
+    img {
+      display: block;
+      margin: auto;
+    }
+  }
+
+  nav a {
+    display: block;
+    padding: 0.5em;
+  }
+
+  a:hover {
+    text-decoration: none;
+  }
+
+  li {
+    list-style: none;
+  }
+
+  ul {
+    padding: 0;
+  }
+
+  .menu-item {
+    display: inline-block;
+    margin: 0;
+    padding-top: 1em;
+    padding-bottom: 1em;
+    font-size: 1em;
+    font-family: $sitnet-family-opensans-light;
+    color: $sitnet-text;
+    font-weight: 300;
+    letter-spacing: 1px;
+    min-width: 175px; // HY CUSTOMIZATION
+  }
+
+  .selected {
+    a {
+      background-color: $sitnet-white;
+      color: $sitnet-blue;
+    }
+
+    .submenu {
+      margin-left: 30px;
+      font-size: 0.8em;
+
+      a {
+        background-color: $sitnet-light-grey;
+        color: $sitnet-dark-grey;
+      }
+    }
+  }
+
+  .user {
+    width: 100%;
+  }
+
+  .user-picture {
+    padding: 1em;
+    display: inline-block;
+    position: relative;
+    left: 0;
+  }
+
+  .user-name {
+    display: inline-block;
+    padding: 1.5em 1em 1em;
+    position: relative;
+    left: 0;
+    font-size: 1em;
+    font-family: $sitnet-family-opensans-light;
+    color: $sitnet-text;
+    font-weight: 300;
+    letter-spacing: 1px;
+  }
+
+  .minify {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    padding: 0.5em;
+    color: $sitnet-blue;
+  }
+
+  .minimize .menu-item {
+    display: none;
+  }
+
+  .locale-minimized {
+    display: inline-block;
+    position: relative;
+    left: 0;
+    padding: 0.5em;
+  }
+
+  .locale-bar {
+    margin: 1em;
+  }
+
+  .locale-item {
+    padding-left: 1.2em;
+    padding-right: 1.2em;
+    cursor: pointer;
+    font-size: 1em;
+    font-family: $sitnet-family-opensans-light;
+    color: $sitnet-text;
+    font-weight: 300;
+    letter-spacing: 1px;
+  }
+
+  .locale-item:hover {
+    a {
+      color: $sitnet-blue-highlight;
+    }
+  }
+}

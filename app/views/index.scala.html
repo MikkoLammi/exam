@@ -163,18 +163,17 @@
     </head>
 
     <body ng-controller="SessionCtrl">
-        <div ng-controller="NavigationCtrl">
+
+        @* HY top header *@
+        <div id="hy-header" class="header">
+            <div class="header-wrapper">
+                <div class="logo"></div>
+                <div class="header-text">EXAMINARIUM</div>
+            </div>
+        </div>
+
+    <div ng-controller="NavigationCtrl">
             <div ng-hide="examStarted" id="vmenu">
-                @*Logo*@
-                <div class="logo">
-                    <div ng-hide="minimizeNavigation">
-                        <img src="@routes.Assets.at("assets/images/exam-logo-black-small.png")" alt="exam" />
-                    </div>
-                    <div ng-hide="!minimizeNavigation">
-                        @*<img src="@routes.Assets.at("assets/images/Exam_logo_vert.png")" alt="exam" />*@
-                    <img width="50" height="90" src="@routes.Assets.at("assets/images/exam-logo-black-small-v.png")" alt="exam" />
-                    </div>
-                </div>
                     @*Language selection*@
                 <div ng-hide="minimizeNavigation">
                     <div class="locale-bar">

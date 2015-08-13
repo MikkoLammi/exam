@@ -1,6 +1,6 @@
 @import "partial/defines";
-@import "partial/vmenu";
-@import "partial/header";
+@import "partial/customization/hy/vmenu"; // HY CUSTOMIZATION
+@import "partial/customization/hy/header"; // HY CUSTOMIZATION
 @import "partial/exam";
 @import "partial/login";
 @import "partial/tables";
@@ -17,6 +17,7 @@
 @import "partial/settings";
 @import "partial/print";
 @import "partial/datetimepicker";
+@import "partial/customization/hy/hy"; // HY CUSTOMIZATION
 
 .essay-dialog .modal-dialog {
   width: 80%;
