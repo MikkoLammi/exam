@@ -20,7 +20,7 @@ public class UserController extends BaseController {
 
     @Restrict({@Group("ADMIN")})
     public Result getUser(Long id) {
-        User user = Ebean.find(User.class).fetch("roles", "name").fetch("userLanguage").where().idEq(id).findUnique();
+        User user = Ebean.find(User.class).fetch("roles", "name").fetch("language").where().idEq(id).findUnique();
 
         if (user == null) {
             return notFound();
@@ -184,11 +184,11 @@ public class UserController extends BaseController {
     public Result updateUserAgreementAccepted(Long id) {
 
         Result result;
-        User user = Ebean.find(User.class).fetch("roles", "name").fetch("userLanguage").where().idEq(id).findUnique();
+        User user = Ebean.find(User.class).fetch("roles", "name").fetch("language").where().idEq(id).findUnique();
         if (user == null) {
             result = notFound();
         } else {
-            user.setHasAcceptedUserAgreament(true);
+            user.setUserAgreementAccepted(true);
             user.save();
             Ebean.update(user);
             result = ok(user);
@@ -200,12 +200,13 @@ public class UserController extends BaseController {
     public Result updateLanguage() {
         User user = getLoggedUser();
         String lang = request().body().asJson().get("lang").asText();
-        UserLanguage language = Ebean.find(UserLanguage.class).where().eq("UILanguageCode", lang).findUnique();
+        Language language = Ebean.find(Language.class, lang);
         if (language == null) {
             return badRequest("Unsupported language code");
         }
-        user.setUserLanguage(language);
+        user.setLanguage(language);
         user.update();
         return ok();
     }
+
 }

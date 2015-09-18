@@ -5,7 +5,6 @@ import be.objectify.deadbolt.java.actions.Restrict;
 import com.avaje.ebean.Ebean;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.typesafe.config.ConfigFactory;
-import exceptions.MalformedDataException;
 import exceptions.NotFoundException;
 import models.*;
 import org.joda.time.DateTime;
@@ -43,7 +42,7 @@ public class SessionController extends BaseController {
 
     private Result hakaLogin() {
         String eppn = toUtf8(request().getHeader("eppn"));
-        if (eppn == null) {
+        if (eppn == null || eppn.isEmpty()) {
             return badRequest("No credentials!");
         }
         User user = Ebean.find(User.class)
@@ -83,32 +82,26 @@ public class SessionController extends BaseController {
         return createSession(UUID.randomUUID().toString(), user);
     }
 
-    private static UserLanguage getLanguage(String code) {
-        UserLanguage language = null;
+    private static Language getLanguage(String code) {
+        Language language = null;
         if (code != null && !code.isEmpty()) {
             // for example: en-US -> en
             code = code.split("-")[0].toLowerCase();
-            language = Ebean.find(UserLanguage.class)
-                    .where()
-                    .eq("nativeLanguageCode", code)
-                    .findUnique();
+            language = Ebean.find(Language.class, code);
         }
         if (language == null) {
             // Default to English
-            language = Ebean.find(UserLanguage.class)
-                    .where()
-                    .eq("nativeLanguageCode", "en")
-                    .findUnique();
+            language = Ebean.find(Language.class, "en");
         }
         return language;
     }
 
-    private static Role getRole(String affiliation) throws NotFoundException {
-        Role role = findRole(affiliation);
-        if (role == null) {
+    private static Set<Role> parseRoles(String affiliation) throws NotFoundException {
+        Set<Role> roles = findRoles(affiliation);
+        if (roles.isEmpty()) {
             throw new NotFoundException("sitnet_error_role_not_found " + affiliation);
         }
-        return role;
+        return roles;
     }
 
     private static String validateEmail(String email) throws AddressException {
@@ -130,8 +123,8 @@ public class SessionController extends BaseController {
 
     private static User createNewUser(String eppn) throws NotFoundException, AddressException {
         User user = new User();
-        user.getRoles().add(getRole(toUtf8(request().getHeader("unscoped-affiliation"))));
-        user.setUserLanguage(getLanguage(toUtf8(request().getHeader("preferredLanguage"))));
+        user.getRoles().addAll(parseRoles(toUtf8(request().getHeader("unscoped-affiliation"))));
+        user.setLanguage(getLanguage(toUtf8(request().getHeader("preferredLanguage"))));
         user.setEppn(eppn);
         updateUser(user);
         return user;
@@ -143,7 +136,10 @@ public class SessionController extends BaseController {
         session.setUserId(user.getId());
         session.setValid(true);
         session.setXsrfToken();
-
+        // If user has just one role, set it as the one used for login
+        if (user.getRoles().size() == 1) {
+            session.setLoginRole(user.getRoles().get(0).getName());
+        }
         cache.set(SITNET_CACHE_KEY + token, session);
 
         ObjectNode result = Json.newObject();
@@ -151,9 +147,9 @@ public class SessionController extends BaseController {
         result.put("token", token);
         result.put("firstname", user.getFirstName());
         result.put("lastname", user.getLastName());
-        result.put("lang", user.getUserLanguage().getUILanguageCode());
+        result.put("lang", user.getLanguage().getCode());
         result.set("roles", Json.toJson(user.getRoles()));
-        result.put("hasAcceptedUserAgreament", user.isHasAcceptedUserAgreament());
+        result.put("userAgreementAccepted", user.isUserAgreementAccepted());
         result.put("userIdentifier", user.getUserIdentifier());
 
         response().setCookie("XSRF-TOKEN", session.getXsrfToken());
@@ -173,25 +169,22 @@ public class SessionController extends BaseController {
         return ok(node);
     }
 
-    private static Role findRole(String affiliation) {
-        List<String> affiliations = Arrays.asList(affiliation.split(";"));
-
-        Map<String, List<String>> roles = getRoles();
-        String roleName = null;
-        if (!Collections.disjoint(affiliations, roles.get("STUDENT"))) {
-            roleName = "STUDENT";
-        } else if (!Collections.disjoint(affiliations, roles.get("TEACHER"))) {
-            roleName = "TEACHER";
-        } else if (!Collections.disjoint(affiliations, roles.get("ADMIN"))) {
-            roleName = "ADMIN";
+    private static Set<Role> findRoles(String attribute) {
+        Map<String, List<String>> roleMapping = getRoleMapping();
+        Set<Role> userRoles = new HashSet<>();
+        for (String affiliation : attribute.split(";")) {
+            if (roleMapping.get("STUDENT").contains(affiliation)) {
+                userRoles.add(Ebean.find(Role.class).where().eq("name", "STUDENT").findUnique());
+            } else if (roleMapping.get("TEACHER").contains(affiliation)) {
+                userRoles.add(Ebean.find(Role.class).where().eq("name", "TEACHER").findUnique());
+            } else if (roleMapping.get("ADMIN").contains(affiliation)) {
+                userRoles.add(Ebean.find(Role.class).where().eq("name", "ADMIN").findUnique());
+            }
         }
-        return roleName == null ? null : Ebean.find(Role.class)
-                .where()
-                .eq("name", roleName)
-                .findUnique();
+        return userRoles;
     }
 
-    static private Map<String, List<String>> getRoles() {
+    static private Map<String, List<String>> getRoleMapping() {
         String[] students = ConfigFactory.load().getString("sitnet.roles.student").split(",");
         String[] teachers = ConfigFactory.load().getString("sitnet.roles.teacher").split(",");
         String[] admins = ConfigFactory.load().getString("sitnet.roles.admin").split(",");
@@ -241,6 +234,30 @@ public class SessionController extends BaseController {
         }
         return ok();
     }
+
+    public Result setLoginRole(Long uid, String roleName) {
+        String token = request().getHeader(LOGIN_TYPE.equals("HAKA") ? "Shib-Session-ID" : SITNET_TOKEN_HEADER_KEY);
+        final String key = SITNET_CACHE_KEY + token;
+        Session session = cache.get(key);
+        if (session == null) {
+            return unauthorized();
+        }
+        User user = Ebean.find(User.class, uid);
+        if (user == null) {
+            return notFound();
+        }
+        Role role = Ebean.find(Role.class).where().eq("name", roleName).findUnique();
+        if (role == null) {
+            return notFound();
+        }
+        if (!user.getRoles().contains(role)) {
+            return forbidden();
+        }
+        session.setLoginRole(roleName);
+        cache.set(SITNET_CACHE_KEY + token, session);
+        return ok();
+    }
+
 
     @Restrict({@Group("TEACHER"), @Group("ADMIN"), @Group("STUDENT")})
     public Result extendSession() {

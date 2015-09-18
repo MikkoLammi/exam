@@ -34,7 +34,7 @@ public class ReservationController extends BaseController {
                 .select("id, name")
                 .where()
                 .isNull("parent") // only Exam prototypes
-                .eq("state", Exam.State.PUBLISHED.toString())
+                .eq("state", Exam.State.PUBLISHED)
                 .gt("examActiveEndDate", new Date());
         if (user.hasRole("TEACHER")) {
             el = el.disjunction()
@@ -94,6 +94,17 @@ public class ReservationController extends BaseController {
         }
 
         return ok(Json.toJson(array));
+    }
+
+    @Restrict({@Group("TEACHER")})
+    public Result permitRetrial(Long id) {
+        Reservation reservation = Ebean.find(Reservation.class, id);
+        if (reservation == null) {
+            return notFound("sitnet_not_found");
+        }
+        reservation.setRetrialPermitted(true);
+        reservation.update();
+        return ok();
     }
 
     @Restrict({@Group("ADMIN")})

@@ -41,8 +41,9 @@ public class User extends GeneratedIdentityModel implements Subject {
     @ManyToMany(cascade = CascadeType.ALL)
     private List<Role> roles;
 
-    @OneToOne
-    private UserLanguage userLanguage;
+    @ManyToOne
+    @JoinColumn(name="language_id")
+    private Language language;
 
     @OneToOne
     private Organisation organisation;
@@ -59,18 +60,18 @@ public class User extends GeneratedIdentityModel implements Subject {
     @JsonManagedReference
     private List<ExamInspection> inspections;
 
+    public boolean isUserAgreementAccepted() {
+        return userAgreementAccepted;
+    }
+
+    public void setUserAgreementAccepted(boolean userAgreementAccepted) {
+        this.userAgreementAccepted = userAgreementAccepted;
+    }
+
     @Column(columnDefinition = "BOOLEAN DEFAULT FALSE")
-    private boolean hasAcceptedUserAgreament;
+    private boolean userAgreementAccepted;
 
     private Date lastLogin;
-
-    public boolean isHasAcceptedUserAgreament() {
-        return hasAcceptedUserAgreament;
-    }
-
-    public void setHasAcceptedUserAgreament(boolean hasAcceptedUserAgreament) {
-        this.hasAcceptedUserAgreament = hasAcceptedUserAgreament;
-    }
 
     public String getEmployeeNumber() {
         return employeeNumber;
@@ -153,12 +154,12 @@ public class User extends GeneratedIdentityModel implements Subject {
         return roles;
     }
 
-    public UserLanguage getUserLanguage() {
-        return userLanguage;
+    public Language getLanguage() {
+        return language;
     }
 
-    public void setUserLanguage(UserLanguage userLanguage) {
-        this.userLanguage = userLanguage;
+    public void setLanguage(Language language) {
+        this.language = language;
     }
 
     @Override

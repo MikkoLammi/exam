@@ -7,6 +7,7 @@ import com.avaje.ebean.Ebean;
 import com.fasterxml.jackson.databind.JsonNode;
 import exceptions.NotFoundException;
 import models.*;
+import models.api.CountsAsTrial;
 import org.joda.time.*;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
@@ -14,6 +15,7 @@ import play.Logger;
 import play.libs.Json;
 import play.mvc.Result;
 import scala.concurrent.duration.Duration;
+import system.ReservationPoller;
 import util.AppUtil;
 import util.java.EmailComposer;
 
@@ -74,12 +76,46 @@ public class CalendarController extends BaseController {
         return ok("removed");
     }
 
-    @Restrict({@Group("TEACHER"), @Group("ADMIN"), @Group("STUDENT")})
+    private boolean isAllowedToParticipate(Long examId) {
+        User user = getLoggedUser();
+        ReservationPoller.handleNoShow(user, examId, emailComposer);
+        Integer trialCount = Ebean.find(Exam.class, examId).getTrialCount();
+        if (trialCount == null) {
+            return true;
+        }
+        List<ExamParticipation> participations = Ebean.find(ExamParticipation.class).where()
+                .eq("user", user)
+                .eq("exam.parent.id", examId)
+                .ne("exam.state", Exam.State.DELETED)
+                .ne("reservation.retrialPermitted", true)
+                .findList();
+        List<ExamEnrolment> noShows = Ebean.find(ExamEnrolment.class).where()
+                .eq("user", user)
+                .eq("exam.id", examId)
+                .eq("reservation.noShow", true)
+                .ne("reservation.retrialPermitted", true)
+                .findList();
+        List<CountsAsTrial> trials = new ArrayList<>(participations);
+        trials.addAll(noShows);
+        // Sort by trial time desc
+        Collections.sort(trials, (o1, o2) -> o1.getTrialTime().after(o2.getTrialTime()) ? -1 : 1);
+
+        if (trials.size() >= trialCount) {
+            List<CountsAsTrial> subset = trials.subList(0, trialCount);
+            return subset.stream().anyMatch(CountsAsTrial::isProcessed);
+        }
+        return true;
+    }
+
+    @Restrict({@Group("ADMIN"), @Group("STUDENT")})
     public Result createReservation() {
         // Parse request body
         JsonNode json = request().body().asJson();
         Long roomId = json.get("roomId").asLong();
         Long examId = json.get("examId").asLong();
+        if (!isAllowedToParticipate(examId)) {
+            return forbidden("sitnet_no_trials_left");
+        }
         Set<Integer> aids = new HashSet<>();
         if (json.has("aids")) {
             Iterator<JsonNode> it = json.get("aids").elements();
@@ -101,7 +137,7 @@ public class CalendarController extends BaseController {
                 .where()
                 .eq("user.id", user.getId())
                 .eq("exam.id", examId)
-                .eq("exam.state", Exam.State.PUBLISHED.toString())
+                .eq("exam.state", Exam.State.PUBLISHED)
                 .disjunction()
                 .isNull("reservation")
                 .gt("reservation.startAt", now.toDate())
@@ -113,7 +149,7 @@ public class CalendarController extends BaseController {
         // no previous reservation or it's in the future
         // Removal not permitted if reservation is in the past or if exam is already started
         Reservation oldReservation = enrolment.getReservation();
-        if (enrolment.getExam().getState().equals(Exam.State.STUDENT_STARTED.toString()) ||
+        if (enrolment.getExam().getState() == Exam.State.STUDENT_STARTED ||
                 (oldReservation != null && oldReservation.toInterval().isBefore(DateTime.now()))) {
             return forbidden("sitnet_reservation_in_effect");
         }
@@ -137,14 +173,24 @@ public class CalendarController extends BaseController {
         if (oldReservation != null) {
             Ebean.delete(oldReservation);
         }
+        Exam exam = enrolment.getExam();
+        Set<User> recipients = new HashSet<>();
+        if (exam.isPrivate()) {
+            recipients.addAll(exam.getExamOwners());
+            recipients.addAll(exam.getExamInspections().stream().map(
+                    ExamInspection::getUser).collect(Collectors.toSet()));
+        }
+        recipients.add(user);
 
         // Send asynchronously
         actor.scheduler().scheduleOnce(Duration.create(1, TimeUnit.SECONDS), () -> {
-            try {
-                emailComposer.composeReservationNotification(user, reservation, enrolment.getExam());
-                Logger.info("Reservation confirmation email sent");
-            } catch (IOException e) {
-                Logger.error("Failed to send reservation confirmation email", e);
+            for (User recipient : recipients) {
+                try {
+                    emailComposer.composeReservationNotification(recipient, reservation, exam);
+                    Logger.info("Reservation confirmation email sent");
+                } catch (IOException e) {
+                    Logger.error("Failed to send reservation confirmation email", e);
+                }
             }
         }, actor.dispatcher());
 
@@ -163,7 +209,7 @@ public class CalendarController extends BaseController {
         return null;
     }
 
-    @Restrict({@Group("TEACHER"), @Group("ADMIN"), @Group("STUDENT")})
+    @Restrict({@Group("ADMIN"), @Group("STUDENT")})
     public Result getSlots(Long examId, Long roomId, String day, List<Integer> aids) {
         Exam exam = getEnrolledExam(examId);
         if (exam == null) {
@@ -288,7 +334,7 @@ public class CalendarController extends BaseController {
                 .where()
                 .eq("user", user)
                 .eq("exam.id", examId)
-                .eq("exam.state", Exam.State.PUBLISHED.toString())
+                .eq("exam.state", Exam.State.PUBLISHED)
                 .disjunction()
                 .isNull("reservation")
                 .gt("reservation.startAt", now.toDate())

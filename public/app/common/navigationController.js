@@ -65,6 +65,12 @@
                             name: "sitnet_reports"
                         },
                         {
+                            href: "#/statistics",
+                            visible: (admin),
+                            class: "fa-line-chart",
+                            name: "sitnet_statistics"
+                        },
+                        {
                             href: "#/settings",
                             visible: (admin),
                             class: "fa-wrench",
@@ -78,7 +84,7 @@
                         },
                         {
                             href: "#/student/exams",
-                            visible: (student && !$scope.wrongMachine),
+                            visible: (student && !$scope.wrongMachine && !$scope.upcomingExam),
                             class: "fa-search",
                             name: "sitnet_exam_search",
                             sub: []
@@ -111,6 +117,7 @@
                 });
 
                 $scope.$on('upcomingExam', function () {
+                    $scope.upcomingExam = true;
                     $scope.links = links();
                 });
 

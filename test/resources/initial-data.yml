@@ -35,27 +35,6 @@ user-roles:
 
 ######################################################################
 
-user_languages:
-    - &suomi !!models.UserLanguage
-      nativeLanguageCode: fi
-      nativeLanguageName: Suomi
-      UILanguageCode: fi
-      UILanguageName: Suomi
-
-    - &englanti !!models.UserLanguage
-      nativeLanguageCode: en
-      nativeLanguageName: Englanti
-      UILanguageCode: en
-      UILanguageName: Englanti
-
-    - &ruotsi !!models.UserLanguage
-      nativeLanguageCode: sv
-      nativeLanguageName: ruotsi
-      UILanguageCode: sv
-      UILanguageName: ruotsi
-
-######################################################################
-
 organisations:
 
     - &OulunYliopisto !!models.Organisation
@@ -101,6 +80,19 @@ organisations:
       code:
       vatIdNumber: FI0245895-1
 
+################################################################
+
+languages:
+
+    - &fi !!models.Language
+      code: fi
+    - &sv !!models.Language
+      code: sv
+    - &en !!models.Language
+      code: en
+    - &de !!models.Language
+      code: de
+
 ######################################################################
 
 users:
@@ -113,7 +105,7 @@ users:
       password:   c74626d3eca0613f356cd34ecd1301c5  #sitnetad
       roles:
             - *role-admin
-      userLanguage: *suomi
+      language: *fi
       organisation: *OulunYliopisto
 
     - &maika !!models.User
@@ -124,7 +116,7 @@ users:
       password:   1d0ebf168b86f79a0c34e81eb1fd70cd  # maikaope
       roles:  
             - *role-teacher
-      userLanguage: *suomi
+      language: *fi
 
 
     - &sauli !!models.User
@@ -135,7 +127,7 @@ users:
       password:   72e6570dbfeb95d5df59e08f1fa6302f   # saulistu
       roles:  
             - *role-student
-      userLanguage: *suomi
+      language: *fi
       organisation: *OulunYliopisto
 
     - &arvo !!models.User
@@ -146,7 +138,7 @@ users:
       password:   f9ba22fb1ff25fd8f83d48f361aea0a4  # arvo
       roles:  
             - *role-teacher
-      userLanguage: *suomi
+      language: *fi
       organisation: *OulunYliopisto
 
     - &soikkeli !!models.User
@@ -157,7 +149,7 @@ users:
       password:   f64213ef053bffe8011e3623543ad9e9  # soikkeli
       roles:  
             - *role-teacher
-      userLanguage: *suomi
+      language: *fi
       organisation: *OulunYliopisto
       
     - &orville !!models.User
@@ -168,7 +160,7 @@ users:
       password:   2664274e7f6f56c565470797478cb406  #oppilas
       roles:  
             - *role-student
-      userLanguage: *suomi
+      language: *fi
       organisation: *OulunYliopisto
 
 ################################################################
@@ -477,10 +469,10 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:
     options:
-        - !!models.questions.MultipleChoiseOption {option: 3, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: 42, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: 99, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: 7, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: 3, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: 42, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: 99, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: 7, correctOption: false, score: 1}
     shared: true
     expanded: false
 
@@ -493,10 +485,10 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:
     options:
-        - !!models.questions.MultipleChoiseOption {option: IDDQD, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: IDKFA, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: IDCLIP, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: IDCHOPPERS, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: IDDQD, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: IDKFA, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: IDCLIP, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: IDCHOPPERS, correctOption: false, score: 1}
     shared: false
     expanded: false
 
@@ -509,9 +501,9 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:
     options:
-        - !!models.questions.MultipleChoiseOption {option: Antiteflon, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Adheesio, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Hakman, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Antiteflon, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Adheesio, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Hakman, correctOption: false, score: 1}
     shared: false
     expanded: false
 
@@ -524,10 +516,10 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:
     options:
-        - !!models.questions.MultipleChoiseOption {option: Lampaita, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Ihmisiä, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Paimenkoiria, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Jokin muu, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Lampaita, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Ihmisiä, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Paimenkoiria, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Jokin muu, correctOption: false, score: 1}
     shared: false
     expanded: false
 
@@ -540,9 +532,9 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:
     options:
-        - !!models.questions.MultipleChoiseOption {option: Tulevaisuus valkenee, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Aika-avaruus jatkumon vääristymä, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Sokaiset itse itsesi sillä valo palaa menneisyyteen ja häikäisee taustapeilistä, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Tulevaisuus valkenee, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Aika-avaruus jatkumon vääristymä, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Sokaiset itse itsesi sillä valo palaa menneisyyteen ja häikäisee taustapeilistä, correctOption: false, score: 1}
     shared: false
     expanded: false
 
@@ -555,9 +547,9 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:  Maailmankaikkeuden rakennetta, kehitystä ja alkuperää tutkiva tiedemies on kosmologi
     options:
-        - !!models.questions.MultipleChoiseOption {option: kosmonautti, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: kosmetologi, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: kosmologi, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: kosmonautti, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: kosmetologi, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: kosmologi, correctOption: true, score: 1}
     shared: false
 
   - &avaruus2 !!models.questions.Question
@@ -569,9 +561,9 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:  Auringon fuusioreaktiot tapahtuvat todellakin auringon ytimessä.
     options:
-        - !!models.questions.MultipleChoiseOption {option: Ytimessä, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Säteilyvyöhykkeessä, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Konvektiovyöhykkeessä, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Ytimessä, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Säteilyvyöhykkeessä, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Konvektiovyöhykkeessä, correctOption: false, score: 1}
     shared: false
 
   - &avaruus3 !!models.questions.Question
@@ -583,9 +575,9 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:  Astronominen yksikkö (eli tähtitieteellinen yksikkö, lyhennys AU) on pituuden yksikkö, jota käytetään lähinnä aurinkokunnan etäisyyksiä ilmoitettaessa. Maan keskietäisyys Auringosta on yksi astronominen yksikkö. Sen suuruus on 149,6 milj. km.
     options:
-        - !!models.questions.MultipleChoiseOption {option: Aikaa, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Etäisyyttä, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Painoa, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Aikaa, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Etäisyyttä, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Painoa, correctOption: false, score: 1}
     shared: false
 
   - &avaruus4 !!models.questions.Question
@@ -597,9 +589,9 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:  Maapallon ratatasoksi on määritelty 0 astetta, ja sitä sanotaan ekliptikaksi.
     options:
-        - !!models.questions.MultipleChoiseOption {option: Maapallon ratataso Aurinkoon nähden, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Maapallon kiertoradan muoto, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Kuun sirppi, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Maapallon ratataso Aurinkoon nähden, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Maapallon kiertoradan muoto, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Kuun sirppi, correctOption: false, score: 1}
     shared: false
 
   - &avaruus5 !!models.questions.Question
@@ -611,10 +603,10 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:  Meteori eli tähdenlento on valoilmiö, joka syntyy, kun pieni kivi eli meteoroidi "palaa" ilmakehässä
     options:
-        - !!models.questions.MultipleChoiseOption {option: Meteoroidi, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Meteori, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Meteoriitti, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Meteorologi, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Meteoroidi, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Meteori, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Meteoriitti, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Meteorologi, correctOption: false, score: 1}
     shared: false
 
   - &avaruus6 !!models.questions.Question
@@ -626,9 +618,9 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:  Hehku EI johdu aineen palamisesta ilmakehässä, eli väittämä on väärä!
     options:
-        - !!models.questions.MultipleChoiseOption {option: Aineen palamisesta ilmakehässä, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Kaasujen hehkumisesta, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Auringon valon heijastumisesta kiintoaineesta, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Aineen palamisesta ilmakehässä, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Kaasujen hehkumisesta, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Auringon valon heijastumisesta kiintoaineesta, correctOption: false, score: 1}
     shared: false
 
   - &avaruus7 !!models.questions.Question
@@ -640,9 +632,9 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:  Jupiter on suurin planeetta. Sen halkaisija on peräti 142 800 km, kun esimerkiksi maan halkaisija on 12 756 km.
     options:
-        - !!models.questions.MultipleChoiseOption {option: Maa, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Jupiter, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Venus, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Maa, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Jupiter, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Venus, correctOption: false, score: 1}
     shared: false
 
 
@@ -655,9 +647,9 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:  Jupiterin pinnalla on suuri punainen pilkku (Great Red Spot, GRS). Tätä kooltaan noin kahta maapalloa vastaavaa laikkua kutsutaan myös Jupiterin silmäksi.
     options:
-        - !!models.questions.MultipleChoiseOption {option: Alkuräjähdystä edeltänyttä tiheää pistettä, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Jupiterin korkeapaineen aluetta, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Mars-planeettaa, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Alkuräjähdystä edeltänyttä tiheää pistettä, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Jupiterin korkeapaineen aluetta, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Mars-planeettaa, correctOption: false, score: 1}
     shared: false
 
 
@@ -670,9 +662,9 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:  Maapallo kiertää Aurinkoa noin 23.5 asteen kulmassa. Tällöin vuorotellen pohjoinen ja eteläinen pallonpuolisko ovat enemmän kallistuneina Aurinkoon päin, ja saavat näin enemmän Auringon säteilyä kuin vastakkainen pallonpuolisko.
     options:
-        - !!models.questions.MultipleChoiseOption {option: Maapallon akselikulman vaihtelemisesta, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Maapallon kiertämisestä Auringon ympäri, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Auringon ja Maan etäisyys muuttuu vuoden aikana, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Maapallon akselikulman vaihtelemisesta, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Maapallon kiertämisestä Auringon ympäri, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Auringon ja Maan etäisyys muuttuu vuoden aikana, correctOption: false, score: 1}
     shared: false
 
 
@@ -685,9 +677,9 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias: Kiertoradallaan Kuu joutuu aika-ajoin Maan ja Auringon väliin. Tällöin se puoli Kuusta, joka on Maasta poispäin kääntyneenä, on valaistunut, ja maanpuoleinen puoli on pimeä. Tällöin Kuuta ei voi nähdä laisinkaan.
     options:
-        - !!models.questions.MultipleChoiseOption {option: Kuu on kiertoradallaan Maasta katsottuna Auringon takana, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Kuu on Auringon ja Maan välissä, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Kuu tulee uudelleen näkyviin, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Kuu on kiertoradallaan Maasta katsottuna Auringon takana, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Kuu on Auringon ja Maan välissä, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Kuu tulee uudelleen näkyviin, correctOption: false, score: 1}
     shared: false
 
 
@@ -700,9 +692,9 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:  Vesimolekyyleihin, kuten kaikkiin muihinkin maapallon pinnalla oleviin kappaleisiin, kohdistuu myös maapallon painovoimaa vastakkaiseen suuntaan vaikuttava voima, nimittäin Kuun painovoima, sekä myös Auringon painovoima, joka on puolet Kuun painovoiman vaikutuksesta.
     options:
-        - !!models.questions.MultipleChoiseOption {option: Kuun vetovoima, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Auringon vetovoima, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Maapallon pinnanmuodot, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Kuun vetovoima, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Auringon vetovoima, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Maapallon pinnanmuodot, correctOption: false, score: 1}
     shared: false
 
 #Multiple choice questions with answers
@@ -717,14 +709,12 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:
     options:
-        - !!models.questions.MultipleChoiseOption {option: 3, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: 42, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: 99, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: 7, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: 3, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: 42, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: 99, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: 7, correctOption: false, score: 1}
     shared: true
     expanded: false
-    answer:
-        !!models.questions.Answer {type: MultipleChoiseAnswer, option: !!models.questions.MultipleChoiseOption {option: 3, correctOption: false, score: 1}}
 
   - &multi2_sauli !!models.questions.Question
     type: MultipleChoiceQuestion
@@ -734,14 +724,12 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:
     options:
-        - !!models.questions.MultipleChoiseOption {option: IDDQD, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: IDKFA, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: IDCLIP, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: IDCHOPPERS, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: IDDQD, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: IDKFA, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: IDCLIP, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: IDCHOPPERS, correctOption: false, score: 1}
     shared: false
     expanded: false
-    answer:
-        !!models.questions.Answer {type: MultipleChoiseAnswer, option: !!models.questions.MultipleChoiseOption {option: IDDQD, correctOption: true, score: 1}}
 
   - &multi4_sauli !!models.questions.Question
     type: MultipleChoiceQuestion
@@ -752,14 +740,12 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:
     options:
-        - !!models.questions.MultipleChoiseOption {option: Lampaita, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Ihmisiä, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Paimenkoiria, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Jokin muu, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Lampaita, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Ihmisiä, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Paimenkoiria, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Jokin muu, correctOption: false, score: 1}
     shared: false
     expanded: false
-    answer:
-        !!models.questions.Answer {type: MultipleChoiseAnswer, option: !!models.questions.MultipleChoiseOption {option: Lampaita, correctOption: true, score: 1}}
 
   - &avaruus4_sauli !!models.questions.Question
     type: MultipleChoiceQuestion
@@ -769,12 +755,10 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:  Maapallon ratatasoksi on määritelty 0 astetta, ja sitä sanotaan ekliptikaksi.
     options:
-        - !!models.questions.MultipleChoiseOption {option: Maapallon ratataso Aurinkoon nähden, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Maapallon kiertoradan muoto, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Kuun sirppi, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Maapallon ratataso Aurinkoon nähden, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Maapallon kiertoradan muoto, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Kuun sirppi, correctOption: false, score: 1}
     shared: false
-    answer:
-        !!models.questions.Answer {type: MultipleChoiseAnswer, option: !!models.questions.MultipleChoiseOption {option: Maapallon kiertoradan muoto, correctOption: false, score: 1}}
 
   - &avaruus5_sauli !!models.questions.Question
     type: MultipleChoiceQuestion
@@ -784,14 +768,11 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:  Meteori eli tähdenlento on valoilmiö, joka syntyy, kun pieni kivi eli meteoroidi "palaa" ilmakehässä
     options:
-        - !!models.questions.MultipleChoiseOption {option: Meteoroidi, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Meteori, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Meteoriitti, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Meteorologi, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Meteoroidi, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Meteori, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Meteoriitti, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Meteorologi, correctOption: false, score: 1}
     shared: false
-    answer:
-        !!models.questions.Answer {type: MultipleChoiseAnswer, option: !!models.questions.MultipleChoiseOption {option: Meteoroidi, correctOption: false, score: 1}}
-
 
   - &multi1b_sauli !!models.questions.Question
     type: MultipleChoiceQuestion
@@ -803,14 +784,12 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:
     options:
-        - !!models.questions.MultipleChoiseOption {option: 3, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: 42, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: 99, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: 7, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: 3, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: 42, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: 99, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: 7, correctOption: false, score: 1}
     shared: true
     expanded: false
-    answer:
-        !!models.questions.Answer {type: MultipleChoiseAnswer, option: !!models.questions.MultipleChoiseOption {option: 3, correctOption: false, score: 1}}
 
   - &multi2b_sauli !!models.questions.Question
     type: MultipleChoiceQuestion
@@ -820,14 +799,12 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:
     options:
-        - !!models.questions.MultipleChoiseOption {option: IDDQD, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: IDKFA, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: IDCLIP, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: IDCHOPPERS, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: IDDQD, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: IDKFA, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: IDCLIP, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: IDCHOPPERS, correctOption: false, score: 1}
     shared: false
     expanded: false
-    answer:
-        !!models.questions.Answer {type: MultipleChoiseAnswer, option: !!models.questions.MultipleChoiseOption {option: IDDQD, correctOption: true, score: 1}}
 
   - &multi4b_sauli !!models.questions.Question
     type: MultipleChoiceQuestion
@@ -838,14 +815,12 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:
     options:
-        - !!models.questions.MultipleChoiseOption {option: Lampaita, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Ihmisiä, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Paimenkoiria, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Jokin muu, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Lampaita, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Ihmisiä, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Paimenkoiria, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Jokin muu, correctOption: false, score: 1}
     shared: false
     expanded: false
-    answer:
-        !!models.questions.Answer {type: MultipleChoiseAnswer, option: !!models.questions.MultipleChoiseOption {option: Lampaita, correctOption: true, score: 1}}
 
   - &avaruus4b_sauli !!models.questions.Question
     type: MultipleChoiceQuestion
@@ -855,12 +830,10 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:  Maapallon ratatasoksi on määritelty 0 astetta, ja sitä sanotaan ekliptikaksi.
     options:
-        - !!models.questions.MultipleChoiseOption {option: Maapallon ratataso Aurinkoon nähden, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Maapallon kiertoradan muoto, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Kuun sirppi, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Maapallon ratataso Aurinkoon nähden, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Maapallon kiertoradan muoto, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Kuun sirppi, correctOption: false, score: 1}
     shared: false
-    answer:
-        !!models.questions.Answer {type: MultipleChoiseAnswer, option: !!models.questions.MultipleChoiseOption {option: Maapallon kiertoradan muoto, correctOption: false, score: 1}}
 
   - &avaruus5b_sauli !!models.questions.Question
     type: MultipleChoiceQuestion
@@ -870,13 +843,11 @@ question_multiple_choice:
     maxScore: 5
     evaluationCriterias:  Meteori eli tähdenlento on valoilmiö, joka syntyy, kun pieni kivi eli meteoroidi "palaa" ilmakehässä
     options:
-        - !!models.questions.MultipleChoiseOption {option: Meteoroidi, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Meteori, correctOption: true, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Meteoriitti, correctOption: false, score: 1}
-        - !!models.questions.MultipleChoiseOption {option: Meteorologi, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Meteoroidi, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Meteori, correctOption: true, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Meteoriitti, correctOption: false, score: 1}
+        - !!models.questions.MultipleChoiceOption {option: Meteorologi, correctOption: false, score: 1}
     shared: false
-    answer:
-        !!models.questions.Answer {type: MultipleChoiseAnswer, option: !!models.questions.MultipleChoiseOption {option: Meteoroidi, correctOption: false, score: 1}}
 
 ######################################################################
 
@@ -1021,19 +992,6 @@ exam-types:
   - &final !!models.ExamType
     type: FINAL
 
-
-################################################################
-
-languages:
-
-  - &fi !!models.Language
-    code: fi
-  - &sv !!models.Language
-    code: sv
-  - &en !!models.Language
-    code: en
-  - &de !!models.Language
-    code: de
 
 ################################################################
 
