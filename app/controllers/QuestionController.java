@@ -7,7 +7,7 @@ import com.avaje.ebean.ExpressionList;
 import com.avaje.ebean.Query;
 import models.Tag;
 import models.User;
-import models.questions.MultipleChoiseOption;
+import models.questions.MultipleChoiceOption;
 import models.questions.Question;
 import play.data.DynamicForm;
 import play.data.Form;
@@ -15,7 +15,12 @@ import play.libs.Json;
 import play.mvc.Result;
 import util.AppUtil;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class QuestionController extends BaseController {
 
@@ -27,14 +32,12 @@ public class QuestionController extends BaseController {
     public Result getQuestions(List<Long> examIds, List<Long> courseIds, List<Long> tagIds, List<Long> sectionIds) {
         User user = getLoggedUser();
         ExpressionList<Question> query = createQuery()
+                .fetch("creator", "firstName, lastName, userIdentifier")
                 .where()
                 .isNull("parent")
                 .ne("state", QuestionState.DELETED.toString());
-        if (user.hasRole("TEACHER")) {
-            query = query.disjunction()
-                    .eq("creator.id", user.getId())
-                    .eq("shared", true)
-                    .endJunction();
+        if (user.hasRole("TEACHER", getSession())) {
+            query = query.eq("creator", user);
         }
         if (!examIds.isEmpty()) {
             query = query.in("children.examSectionQuestion.examSection.exam.id", examIds);
@@ -52,9 +55,21 @@ public class QuestionController extends BaseController {
         return ok(questions);
     }
 
-    @Restrict({@Group("TEACHER"), @Group("ADMIN"), @Group("STUDENT")})
+    @Restrict({@Group("TEACHER"), @Group("ADMIN")})
     public Result getQuestion(Long id) {
-        Question question = Ebean.find(Question.class, id);
+        User user = getLoggedUser();
+        ExpressionList<Question> query = Ebean.find(Question.class).where().idEq(id);
+        if (user.hasRole("TEACHER", getSession())) {
+            query = query.disjunction()
+                    .eq("creator", user)
+                    .eq("examSectionQuestion.examSection.exam.examOwners", user)
+                    .endJunction();
+        }
+        Question question = query.findUnique();
+        if (question == null) {
+            return forbidden("sitnet_error_access_forbidden");
+        }
+        Collections.sort(question.getOptions());
         return ok(Json.toJson(question));
     }
 
@@ -64,8 +79,9 @@ public class QuestionController extends BaseController {
         Question copy = question.copy();
         copy.setParent(null);
         copy.setQuestion(String.format("<p>**COPY**</p>%s", question.getQuestion()));
-        copy.setCreated(new Date());
-        copy.setCreator(getLoggedUser());
+        User user = getLoggedUser();
+        AppUtil.setCreator(copy, user);
+        AppUtil.setModifier(copy, user);
         copy.save();
         copy.getTags().addAll(question.getTags());
         copy.update();
@@ -76,9 +92,11 @@ public class QuestionController extends BaseController {
     @Restrict({@Group("TEACHER"), @Group("ADMIN")})
     public Result addQuestion() {
         Question question = bindForm(Question.class);
-        AppUtil.setCreator(question, getLoggedUser());
+        User user = getLoggedUser();
+        AppUtil.setCreator(question, user);
+        AppUtil.setModifier(question, user);
         question.setState(QuestionState.NEW.toString());
-        Ebean.save(question);
+        question.save();
         return ok(Json.toJson(question));
     }
 
@@ -91,7 +109,7 @@ public class QuestionController extends BaseController {
         return ok(Json.toJson(essayQuestion));
     }
 
-    private static void doUpdateQuestion(Question question, DynamicForm df) {
+    private static void doUpdateQuestion(Question question, DynamicForm df, User user) {
         if (df.get("question") != null) {
             question.setQuestion(df.get("question"));
         }
@@ -102,12 +120,10 @@ public class QuestionController extends BaseController {
         question.setEvaluationCriterias(df.get("evaluationCriterias"));
         question.setShared(Boolean.parseBoolean(df.get("shared")));
         question.setState(QuestionState.SAVED.toString());
+        AppUtil.setModifier(question, user);
         question.update();
     }
 
-    private static boolean hasCorrectOption(Question question) {
-        return question.getOptions().stream().anyMatch(MultipleChoiseOption::isCorrectOption);
-    }
 
     @Restrict({@Group("TEACHER"), @Group("ADMIN")})
     public Result updateQuestion(Long id) {
@@ -116,78 +132,23 @@ public class QuestionController extends BaseController {
         if (question == null) {
             return notFound("question not found");
         }
-        switch (df.get("type")) {
-            case "EssayQuestion":
-                if (df.get("maxCharacters") != null) {
-                    question.setMaxCharacters(Long.parseLong(df.get("maxCharacters")));
-                }
-                if (df.get("evaluationType") != null) {
-                    question.setEvaluationType(df.get("evaluationType"));
-                }
-                doUpdateQuestion(question, df);
-                return ok(Json.toJson(question));
-            case "MultipleChoiceQuestion":
-                if (question.getOptions().size() < 2) {
-                    return forbidden("sitnet_minimum_of_two_options_required");
-                }
-                if (!hasCorrectOption(question)) {
-                    return forbidden("sitnet_correct_option_required");
-                }
-                doUpdateQuestion(question, df);
-                return ok(Json.toJson(question));
-            default:
-                return badRequest();
+        User user = getLoggedUser();
+        if (df.get("maxCharacters") != null) {
+            question.setMaxCharacters(Long.parseLong(df.get("maxCharacters")));
         }
-    }
-
-    @Restrict({@Group("TEACHER"), @Group("ADMIN")})
-    public Result updateQuestionOwner(Long uid) {
-
-        final User teacher = Ebean.find(User.class, uid);
-
-        if (teacher == null) {
-            return notFound();
+        question.setEvaluationType(df.get("evaluationType"));
+        String validationResult = question.validate();
+        if (validationResult != null) {
+            return forbidden(validationResult);
         }
-
-        final DynamicForm df = Form.form().bindFromRequest();
-        final String questionIds = df.data().get("questionIds");
-
-        if (questionIds == null || questionIds.length() < 1) {
-            return notFound();
-        }
-
-        // get new teacher tags
-        List<Tag> teacherTags = Ebean.find(Tag.class)
-                .where()
-                .eq("creator.id", teacher.getId())
-                .findList();
-
-        for (String s : questionIds.split(",")) {
-            final Question question = Ebean.find(Question.class, Integer.parseInt(s));
-
-            if (question != null) {
-
-                handleTags(question, teacherTags, teacher); // handle question tags
-                question.setCreator(teacher);
-                question.update();
-
-                if (question.getChildren() != null && question.getChildren().size() > 0) {
-                    for (Question childQuestion : question.getChildren()) {
-                        handleTags(childQuestion, teacherTags, teacher); // handle question tags
-                        childQuestion.setCreator(teacher);
-                        childQuestion.update();
-                    }
-                }
-            }
-        }
-
-        return ok();
+        doUpdateQuestion(question, df, user);
+        return ok(Json.toJson(question));
     }
 
     @Restrict({@Group("TEACHER"), @Group("ADMIN")})
     public Result updateOption(Long oid) {
-        MultipleChoiseOption form = bindForm(MultipleChoiseOption.class);
-        MultipleChoiseOption option = Ebean.find(MultipleChoiseOption.class, oid);
+        MultipleChoiceOption form = bindForm(MultipleChoiceOption.class);
+        MultipleChoiceOption option = Ebean.find(MultipleChoiceOption.class, oid);
         option.setOption(form.getOption());
         option.setScore(form.getScore());
         option.update();
@@ -196,13 +157,13 @@ public class QuestionController extends BaseController {
 
     @Restrict({@Group("TEACHER"), @Group("ADMIN")})
     public Result toggleCorrectOption(Long oid) {
-        MultipleChoiseOption option = Ebean.find(MultipleChoiseOption.class, oid);
+        MultipleChoiceOption option = Ebean.find(MultipleChoiceOption.class, oid);
         if (option == null) {
             return notFound();
         }
         boolean isCorrect = !option.isCorrectOption();
         Question question = option.getQuestion();
-        for (MultipleChoiseOption mco : option.getQuestion().getOptions()) {
+        for (MultipleChoiceOption mco : option.getQuestion().getOptions()) {
             if (mco.equals(option)) {
                 mco.setCorrectOption(isCorrect);
             } else {
@@ -218,13 +179,14 @@ public class QuestionController extends BaseController {
     public Result deleteQuestion(Long id) {
         Question question = Ebean.find(Question.class, id);
         question.setState(QuestionState.DELETED.toString());
+        AppUtil.setModifier(question, getLoggedUser());
         question.save();
         return ok("Question deleted from database!");
     }
 
     @Restrict({@Group("TEACHER"), @Group("ADMIN")})
     public Result deleteOption(Long oid) {
-        Ebean.delete(MultipleChoiseOption.class, oid);
+        Ebean.delete(MultipleChoiceOption.class, oid);
         return ok("Option deleted from database!");
     }
 
@@ -232,29 +194,12 @@ public class QuestionController extends BaseController {
     public Result addOption(Long qid) {
 
         Question question = Ebean.find(Question.class, qid);
-        MultipleChoiseOption option = bindForm(MultipleChoiseOption.class);
+        MultipleChoiceOption option = bindForm(MultipleChoiceOption.class);
         question.getOptions().add(option);
+        AppUtil.setModifier(question, getLoggedUser());
         question.save();
         option.save();
 
-        return ok(Json.toJson(option));
-    }
-
-
-    @Restrict({@Group("TEACHER"), @Group("ADMIN")})
-    public Result createOption() {
-
-        MultipleChoiseOption option = new MultipleChoiseOption();
-        option.setCorrectOption(false);
-        option.save();
-
-        return ok(Json.toJson(option));
-    }
-
-    @Restrict({@Group("TEACHER"), @Group("ADMIN"), @Group("STUDENT")})
-    public Result getOption(Long id) {
-
-        MultipleChoiseOption option = Ebean.find(MultipleChoiseOption.class, id);
         return ok(Json.toJson(option));
     }
 
@@ -267,59 +212,75 @@ public class QuestionController extends BaseController {
                 .fetch("children.examSectionQuestion.examSection.exam.course", "code");
     }
 
+    @Restrict({@Group("TEACHER"), @Group("ADMIN")})
+    public Result updateQuestionOwner(Long uid) {
 
-    private static void handleTags(Question question, List<Tag> teacherTags, User teacher) {
-        if (question != null && question.getTags() != null) {
-            List<Tag> tags = question.getTags();
-            for (Tag tag : tags) {
+        User teacher = Ebean.find(User.class, uid);
+        if (teacher == null) {
+            return notFound();
+        }
+        final DynamicForm df = Form.form().bindFromRequest();
+        final String questionIds = df.data().get("questionIds");
+        if (questionIds == null || questionIds.isEmpty()) {
+            return badRequest();
+        }
 
-                // create new tag and add it to question if current user has no tags ->
-                if (teacherTags == null) {
-                    addNewTag(tag, question, teacher);
-                    removeOldTag(tag, question);
-                    continue;
+        List<Tag> tagsOfNewOwner = Ebean.find(Tag.class)
+                .where()
+                .eq("creator.id", teacher.getId())
+                .findList();
+
+        User originalUser = getLoggedUser();
+        List<Long> ids = Stream.of(questionIds.split(",")).map(Long::parseLong).collect(Collectors.toList());
+        Ebean.find(Question.class).where().idIn(ids).findList().forEach(q -> {
+            changeOwnership(q, originalUser, teacher, tagsOfNewOwner);
+            q.getChildren()
+                    .forEach(cq -> changeOwnership(cq, originalUser, teacher, tagsOfNewOwner));
+        });
+        return ok();
+    }
+
+    private static void changeOwnership(Question question, User oldOwner, User newOwner, List<Tag> tagsOfNewOwner) {
+        AppUtil.setCreator(question, newOwner);
+        AppUtil.setModifier(question, oldOwner);
+        question.update();
+        handleTags(question, tagsOfNewOwner, newOwner); // handle question tags
+    }
+
+    private static void handleTags(Question question, List<Tag> tagsOfNewOwner, User teacher) {
+        for (Tag oldTag : question.getTags()) {
+            int index = tagsOfNewOwner.indexOf(oldTag);
+            if (index > -1) {
+                Tag existingTag = tagsOfNewOwner.get(index);
+                // Replace with existing tag
+                if (!existingTag.getQuestions().contains(question)) {
+                    existingTag.getQuestions().add(question);
+                    existingTag.update();
                 }
+            } else {
+                // Create new
+                Tag newTag = addNewTag(oldTag.getName(), question, teacher);
+                tagsOfNewOwner.add(newTag);
 
-                // check if user has tag with same name ->
-                Boolean add = true;
-                for (Tag userTag : teacherTags) {
-
-                    // if user has a tag with same name ->
-                    // remove question old user's tag and add new user's own tag to question
-                    if (userTag.getName().equalsIgnoreCase(tag.getName())) { // case insensitive !!!
-                        add = false;
-                        if (!userTag.getQuestions().contains(question)) {
-                            userTag.getQuestions().add(question);
-                            userTag.update();
-                        }
-                        removeOldTag(tag, question);
-
-                        break;
-                    }
-                }
-
-                // if user does not have a tag with same name -> add
-                if (add) {
-                    addNewTag(tag, question, teacher);
-                    removeOldTag(tag, question);
-                }
             }
+            removeOldTag(oldTag, question);
         }
     }
 
-    private static void addNewTag(Tag tag, Question question, User teacher) {
+    private static Tag addNewTag(String name, Question question, User teacher) {
         Tag newTag = new Tag();
-        newTag.setName(tag.getName());
+        newTag.setName(name);
         newTag.setCreator(teacher);
+        newTag.setCreated(new Date());
         newTag.getQuestions().add(question);
         newTag.save();
+        return newTag;
     }
 
     private static void removeOldTag(Tag tag, Question question) {
         tag.getQuestions().remove(question);
         tag.update();
-
-        if (tag.getQuestions() == null || tag.getQuestions().size() == 0) {
+        if (tag.getQuestions().isEmpty()) {
             tag.delete();
         }
     }

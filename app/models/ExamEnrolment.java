@@ -1,6 +1,9 @@
 package models;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import models.api.CountsAsTrial;
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
 
 import javax.annotation.Nonnull;
 import javax.persistence.*;
@@ -8,7 +11,7 @@ import java.util.Date;
 
 
 @Entity
-public class ExamEnrolment extends GeneratedIdentityModel implements Comparable<ExamEnrolment> {
+public class ExamEnrolment extends GeneratedIdentityModel implements Comparable<ExamEnrolment>, CountsAsTrial {
 
     @ManyToOne
     @JsonBackReference
@@ -78,6 +81,42 @@ public class ExamEnrolment extends GeneratedIdentityModel implements Comparable<
 
     @Override
     public int compareTo(@Nonnull ExamEnrolment other) {
-        return enrolledOn.compareTo(other.enrolledOn);
+        if (reservation == null && other.reservation == null) {
+            return 0;
+        }
+        if (reservation == null) {
+            return -1;
+        }
+        if (other.reservation == null) {
+            return 1;
+        }
+        return reservation.compareTo(other.reservation);
+    }
+
+    @Override
+    @Transient
+    public Date getTrialTime() {
+        return reservation == null ? null : reservation.getStartAt();
+    }
+
+    @Override
+    @Transient
+    public boolean isProcessed() {
+        return reservation == null || !reservation.isNoShow();
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) return true;
+        if (!(other instanceof ExamEnrolment)) {
+            return false;
+        }
+        ExamEnrolment otherEnrolment = (ExamEnrolment) other;
+        return new EqualsBuilder().append(id, otherEnrolment.id).build();
+    }
+
+    @Override
+    public int hashCode() {
+        return new HashCodeBuilder().append(id).build();
     }
 }

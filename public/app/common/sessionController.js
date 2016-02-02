@@ -3,94 +3,25 @@
     // automatically by the run block in app.js
     'use strict';
     angular.module("exam.controllers")
-        .controller('SessionCtrl', ['$scope', '$rootScope', '$location', '$modal', '$translate', 'sessionService', 'UserRes', 'SettingsResource', 'EXAM_CONF',
-            function ($scope, $rootScope, $location, $modal, $translate, sessionService, UserRes, SettingsResource, EXAM_CONF) {
+        .controller('SessionCtrl', ['$scope', '$location', '$translate', 'sessionService',
+            function ($scope, $location, $translate, sessionService) {
 
-                $scope.credentials = {};
-                $scope.env = {};
-
-                SettingsResource.environment.get(function(env) {
-                    $scope.env = env;
-                    if (!env.isProd) {
-                        $scope.loginTemplatePath = EXAM_CONF.TEMPLATES_PATH + "common/dev_login.html";
-                    }
-                });
-
-                $scope.logout = function () {
-                    sessionService.logout().then(function (data) {
-                        delete $scope.user;
-                        $rootScope.$broadcast('userUpdated');
-                        toastr.success($translate.instant("sitnet_logout_success"));
-                        if (data && data.logoutUrl) {
-                            var returnUrl = window.location.protocol + "//" + window.location.host + "/Shibboleth.sso/Logout";
-                            window.location.href = data.logoutUrl + "?return=" + returnUrl;
-                        } else if ($scope.env.isProd) {
-                            $scope.loginTemplatePath = EXAM_CONF.TEMPLATES_PATH + "common/logout.html";
-                        } else {
-                            $location.path("/login")
-                        }
-                    });
-                };
-
-                if ($location.url() == "/logout") {
-                    if (sessionService.getUser()) {
-                        $scope.logout();
-                    }
-                }
+                $scope.credentials = {}; // DEV-login only
 
                 $scope.switchLanguage = function (key) {
                     sessionService.switchLanguage(key);
                 };
 
                 $scope.login = function () {
-                    sessionService.login($scope.credentials.username, $scope.credentials.password).then(function () {
-
-                        var user = sessionService.getUser();
-                        $rootScope.$broadcast('userUpdated');
-
-                        var welcome = function () {
-                            toastr.success($translate.instant("sitnet_welcome") + " " + user.firstname + " " + user.lastname);
-                        };
-                        setTimeout(welcome, 2000);
-
-                        if (user.isStudent && !user.hasAcceptedUserAgreament) {
-
-                            $modal.open({
-
-                                templateUrl: EXAM_CONF.TEMPLATES_PATH + 'common/show_eula.html',
-                                backdrop: 'static',
-                                keyboard: false,
-                                controller: function ($scope, $modalInstance, sessionService) {
-
-                                    $scope.ok = function () {
-                                        // OK button
-                                        UserRes.updateAgreementAccepted.update({id: user.id}, function () {
-                                            user.hasAcceptedUserAgreament = true;
-                                            sessionService.setUser(user);
-                                        }, function (error) {
-                                            toastr.error(error.data);
-                                        });
-                                        $modalInstance.dismiss();
-                                        if ($location.url() === '/login' || $location.url() === '/logout') {
-                                            $location.path("/");
-                                        }
-                                    };
-                                    $scope.cancel = function () {
-                                        $modalInstance.dismiss('cancel');
-                                        $location.path("/logout");
-                                    };
-                                }
-                            });
-                        } else if ($location.url() === '/login' || $location.url() === '/logout') {
-                            $location.path("/");
-                        }
-                    }, function (message) {
-                        if ($location.url() === '/login' || $location.url() === '/logout') {
-                            $location.path("/logout");
-                            toastr.error(message);
-                        }
-                    });
+                    sessionService.login($scope.credentials.username, $scope.credentials.password);
                 };
+
+                sessionService.setLoginEnv($scope);
+
+                if ($location.url() == "/logout") {
+                    sessionService.logout();
+                }
+
             }
         ]);
 }());

@@ -3,7 +3,6 @@ package system;
 
 import com.avaje.ebean.Ebean;
 import com.google.inject.Inject;
-import com.typesafe.config.ConfigFactory;
 import controllers.BaseController;
 import models.*;
 import org.joda.time.DateTime;
@@ -21,36 +20,54 @@ import util.AppUtil;
 
 import javax.xml.bind.DatatypeConverter;
 import java.lang.reflect.Method;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class SystemRequestHandler implements HttpRequestHandler {
 
-    public static final String SITNET_FAILURE_HEADER_KEY = "x-exam-token-failure";
-    public static final String SITNET_CACHE_KEY = "user.session.";
-    private static final String LOGIN_TYPE = ConfigFactory.load().getString("sitnet.login");
+    private static final String SITNET_FAILURE_HEADER_KEY = "x-exam-token-failure";
 
     protected CacheApi cache;
 
     @Inject
     public SystemRequestHandler(CacheApi cache) {
         this.cache = cache;
-
     }
 
     @Override
     public Action createAction(Http.Request request, Method actionMethod) {
-        String token = request.getHeader(LOGIN_TYPE.equals("HAKA") ? "Shib-Session-ID" :
-                BaseController.SITNET_TOKEN_HEADER_KEY);
-        Session session = cache.get(SITNET_CACHE_KEY + token);
-        AuditLogger.log(request, session);
-
+        String token = BaseController.getToken(request);
+        Session session = cache.get(BaseController.SITNET_CACHE_KEY + token);
+        User user = session == null ? null : Ebean.find(User.class, session.getUserId());
+        AuditLogger.log(request, user);
         if (session == null) {
             Logger.info("Session with token {} not found", token);
-            return doCreateAction();
+            return propagateAction();
+        }
+        Action validationAction = validateSession(session, token);
+        if (validationAction != null) {
+            return validationAction;
         }
 
+        updateSession(request, session, token);
+
+        if (user == null || !user.hasRole("STUDENT", session) || request.path().equals("/logout")) {
+            // propagate further right away
+            return propagateAction();
+        } else {
+            // requests are candidates for extra processing
+            return processAction(request, user);
+        }
+    }
+
+    @Override
+    public Action wrapAction(Action action) {
+        return action;
+    }
+
+    private Action validateSession(Session session, String token) {
         if (!session.isValid()) {
             Logger.warn("Session #{} is marked as invalid", token);
             return new Action.Simple() {
@@ -63,18 +80,10 @@ public class SystemRequestHandler implements HttpRequestHandler {
                 }
             };
         }
+        return null;
+    }
 
-        updateSession(request, session, token);
-
-        if (session.getUserId() == null) {
-            return doCreateAction();
-        }
-
-        User user = Ebean.find(User.class, session.getUserId());
-        if (user == null || !user.hasRole("STUDENT") || request.path().equals("/logout")) {
-            return doCreateAction();
-        }
-
+    private Action processAction(Http.Request request, User user) {
         ExamEnrolment ongoingEnrolment = getNextEnrolment(user.getId(), 0);
         if (ongoingEnrolment != null) {
             return handleOngoingEnrolment(ongoingEnrolment, request);
@@ -88,23 +97,29 @@ public class SystemRequestHandler implements HttpRequestHandler {
                 // User is logged on an exam machine but has no exams for today
                 Map<String, String> headers = new HashMap<>();
                 headers.put("x-exam-upcoming-exam", "none");
-                return new AddHeader(doCreateAction(), headers);
+                return propagateAction(headers);
             } else {
-                return doCreateAction();
+                return propagateAction();
             }
         }
     }
 
-    @Override
-    public Action wrapAction(Action action) {
-        return action;
+    private Action propagateAction() {
+        return propagateAction(Collections.emptyMap());
     }
 
-    private Action doCreateAction() {
+    private Action propagateAction(Map<String, String> headers) {
         return new Action.Simple() {
             @Override
             public F.Promise<Result> call(Http.Context ctx) throws Throwable {
-                return delegate.call(ctx);
+                F.Promise<Result> promise = delegate.call(ctx);
+                Http.Response response = ctx.response();
+                response.setHeader("Cache-Control", "no-cache;no-store");
+                response.setHeader("Pragma", "no-cache");
+                for (Map.Entry<String, String> entry : headers.entrySet()) {
+                    response.setHeader(entry.getKey(), entry.getValue());
+                }
+                return promise;
             }
         };
     }
@@ -112,7 +127,7 @@ public class SystemRequestHandler implements HttpRequestHandler {
     private void updateSession(Http.Request request, Session session, String token) {
         if (!request.path().contains("checkSession")) {
             session.setSince(DateTime.now());
-            cache.set(SITNET_CACHE_KEY + token, session);
+            cache.set(BaseController.SITNET_CACHE_KEY + token, session);
         }
     }
 
@@ -120,18 +135,20 @@ public class SystemRequestHandler implements HttpRequestHandler {
         return Ebean.find(ExamMachine.class).where().eq("ipAddress", request.remoteAddress()).findUnique() != null;
     }
 
-    private boolean machineOk(ExamEnrolment enrolment, Http.Request request, Map<String,
+    private boolean isMachineOk(ExamEnrolment enrolment, Http.Request request, Map<String,
             String> headers) {
+        // Loose the checks for dev usage to facilitate for easier testing
+        if (Play.isDev()) {
+            return true;
+        }
         ExamMachine examMachine = enrolment.getReservation().getMachine();
         ExamRoom room = examMachine.getRoom();
 
         String machineIp = examMachine.getIpAddress();
         String remoteIp = request.remoteAddress();
 
-        Logger.debug("\nUser ip: " + remoteIp + "\nreservation machine ip: " + machineIp);
+        Logger.debug("User is on IP: {} <-> Should be on IP: {}", remoteIp, machineIp);
 
-        //todo: is there another way to identify/match machines?
-        //todo: eg. some transparent proxy that add id header etc.
         if (!remoteIp.equals(machineIp)) {
             String message;
             String header;
@@ -166,24 +183,23 @@ public class SystemRequestHandler implements HttpRequestHandler {
 
     private Action handleOngoingEnrolment(ExamEnrolment enrolment, Http.Request request) {
         Map<String, String> headers = new HashMap<>();
-        if (!Play.isDev() && !machineOk(enrolment, request, headers)) {
-            return new AddHeader(doCreateAction(), headers);
+        if (!isMachineOk(enrolment, request, headers)) {
+            return propagateAction(headers);
         }
         String hash = enrolment.getExam().getHash();
         headers.put("x-exam-start-exam", hash);
-        return new AddHeader(doCreateAction(), headers);
+        return propagateAction(headers);
     }
-
 
     private Action handleUpcomingEnrolment(ExamEnrolment enrolment, Http.Request request) {
         Map<String, String> headers = new HashMap<>();
-        if (!Play.isDev() && !machineOk(enrolment, request, headers)) {
-            return new AddHeader(doCreateAction(), headers);
+        if (!isMachineOk(enrolment, request, headers)) {
+            return propagateAction(headers);
         }
         String hash = enrolment.getExam().getHash();
         headers.put("x-exam-start-exam", hash);
         headers.put("x-exam-upcoming-exam", enrolment.getId().toString());
-        return new AddHeader(doCreateAction(), headers);
+        return propagateAction(headers);
     }
 
     private ExamEnrolment getNextEnrolment(Long userId, int minutesToFuture) {
@@ -197,8 +213,8 @@ public class SystemRequestHandler implements HttpRequestHandler {
                 .where()
                 .eq("user.id", userId)
                 .disjunction()
-                .eq("exam.state", Exam.State.PUBLISHED.toString())
-                .eq("exam.state", Exam.State.STUDENT_STARTED.toString())
+                .eq("exam.state", Exam.State.PUBLISHED)
+                .eq("exam.state", Exam.State.STUDENT_STARTED)
                 .endJunction()
                 .le("reservation.startAt", future)
                 .gt("reservation.endAt", now)
@@ -208,27 +224,6 @@ public class SystemRequestHandler implements HttpRequestHandler {
             return null;
         }
         return results.get(0);
-    }
-
-    @SuppressWarnings("unchecked")
-    private class AddHeader extends Action {
-        private Map<String, String> headers;
-
-        public AddHeader(Action action, Map<String, String> headers) {
-            this.headers = headers;
-            delegate = action;
-        }
-
-        @Override
-        public F.Promise<Result> call(Http.Context context) throws Throwable {
-            F.Promise<Result> promise = delegate.call(context);
-            Http.Response response = context.response();
-
-            for (Map.Entry<String, String> entry : headers.entrySet()) {
-                response.setHeader(entry.getKey(), entry.getValue());
-            }
-            return promise;
-        }
     }
 
 }

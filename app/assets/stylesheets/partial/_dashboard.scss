@@ -13,6 +13,19 @@
     padding-right: 1em;
   }
 
+  .student-enrolment-wrapper {
+    @extend .row;
+    padding-bottom: 1em;
+  }
+
+  .detail-row-tall {
+    @extend .row;
+    margin: 0;
+    padding-left: 1em;
+    padding-right: 1em;
+    padding-bottom: 1em;
+  }
+
   .bottom-row {
     @extend .detail-row;
     padding-bottom: 1em;
@@ -21,6 +34,20 @@
   .top-row {
     @extend .detail-row;
     padding-top: 1em;
+  }
+
+  .top-row-narrow {
+    @extend .top-row;
+    padding-left: 0;
+    padding-right: 0;
+    margin: 0 -15px 0 -15px;
+  }
+
+  .bottom-row-narrow {
+    @extend .bottom-row;
+    padding-left: 0;
+    padding-right: 0;
+    margin: 0 -15px 0 -15px;
   }
 
   .main-row {
@@ -36,6 +63,10 @@
 
   .spaced-column {
     margin-right: 2em;
+  }
+
+  .wide-column {
+    padding-right: 0;
   }
 
   .title {
@@ -64,10 +95,8 @@
 
     th {
       background-color: $sitnet-common-light;
-      font-family: $sitnet-family-georgia;
       color: $sitnet-common-medium;
-      font-style: italic;
-      font-weight: normal;
+      font-weight: bold;
       border: 0;
     }
 
@@ -178,8 +207,32 @@
     vertical-align: middle;
   }
 
-  ul {
-    list-style-type: none;
+  .inline-list li {
+    list-style: none;
+  }
+
+  .wide-select {
+    width: 100%;
+  }
+
+  .muted-list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .vcenter {
+    display: inline-block;
+    vertical-align: middle;
+    float: none;
+  }
+
+  .text-dim {
+    color: grey;
+    font-style: italic;
+  }
+
+  .review-html-container {
+    padding-left: 1em;
   }
 
   // fade in/out animations for list items
@@ -206,6 +259,45 @@
   .exam-logout-wrapper {
     margin: 200px 50px 200px 50px;
     text-align: center;
+  }
+
+  .report-category {
+    margin: 2em;
+    border: 2px solid lightgrey;
+    border-radius: 4pt;
+  }
+
+  .library-question-header-inactive {
+    color: white;
+    background-color: rgba(0, 0, 0, 0.3);
+    min-height: 2em;
+    margin: 0.3em 0;
+    font-size: 0.9em;
+    padding: 0.3em;
+  }
+
+  .library-question-header-inactive:hover {
+    background-color: $sitnet-theme;
+    cursor: move;
+  }
+
+  .sorted-column {
+
+    i {
+      color: black;
+    }
+  }
+
+  @media print {
+
+    a[href]:after {
+      content: none !important;
+    }
+
+    .no-print {
+      display: none !important;
+    }
+
   }
 
 }

@@ -9,10 +9,11 @@
             };
         })
 
-        .controller('QuestionCtrl', ['dialogs', '$rootScope', '$scope', '$q', '$http', '$modal', '$routeParams', '$location', '$translate', 'focus', 'QuestionRes', 'ExamRes', 'TagRes', 'EXAM_CONF', 'fileService',
-            function (dialogs, $rootScope, $scope, $q, $http, $modal, $routeParams, $location, $translate, focus, QuestionRes, ExamRes, TagRes, EXAM_CONF, fileService) {
-
-                $scope.newOptionTemplate = EXAM_CONF.TEMPLATES_PATH + "question/editor/multiple_choice_option.html";
+        .controller('QuestionCtrl', ['dialogs', '$rootScope', '$scope', '$q', '$http', '$modal', '$routeParams',
+            '$location', '$translate', 'focus', 'QuestionRes', 'questionService', 'ExamRes', 'TagRes', 'EXAM_CONF',
+            'fileService',
+            function (dialogs, $rootScope, $scope, $q, $http, $modal, $routeParams, $location, $translate, focus,
+                      QuestionRes, questionService, ExamRes, TagRes, EXAM_CONF, fileService) {
 
                 var essayQuestionTemplate = EXAM_CONF.TEMPLATES_PATH + "question/editor/essay_question.html";
                 var multiChoiceQuestionTemplate = EXAM_CONF.TEMPLATES_PATH + "question/editor/multiple_choice_question.html";
@@ -29,13 +30,13 @@
                     return array.indexOf(search) >= 0;
                 }
 
-
                 QuestionRes.questions.get({id: qid},
                     function (question) {
                         $scope.newQuestion = question;
                         $scope.setQuestionType();
-                        if ($scope.newQuestion.evaluationType && $scope.newQuestion.evaluationType === 'Select') {
-                            $scope.newQuestion.maxScore = undefined; // will screw up validation otherwise
+                        if ($scope.newQuestion.type === 'WeightedMultipleChoiceQuestion' ||
+                            ($scope.newQuestion.evaluationType && $scope.newQuestion.evaluationType === 'Select')) {
+                            delete $scope.newQuestion.maxScore; // will screw up validation otherwise
                         }
 
                         if ($routeParams.examId) {
@@ -110,10 +111,13 @@
                             $scope.newQuestion.evaluationType = $scope.newQuestion.evaluationType || "Points";
                             $scope.estimateWords();
                             break;
-
                         case 'MultipleChoiceQuestion':
                             $scope.questionTemplate = multiChoiceQuestionTemplate;
-                            $scope.newQuestion.type = "MultipleChoiceQuestion";
+                            $scope.newOptionTemplate = EXAM_CONF.TEMPLATES_PATH + "question/editor/option.html";
+                            break;
+                        case 'WeightedMultipleChoiceQuestion':
+                            $scope.questionTemplate = multiChoiceQuestionTemplate;
+                            $scope.newOptionTemplate = EXAM_CONF.TEMPLATES_PATH + "question/editor/weighted_option.html";
                             break;
                     }
                 };
@@ -121,6 +125,10 @@
                 $scope.estimateWords = function () {
                     $scope.newQuestion.words = Math.ceil($scope.newQuestion.maxCharacters / 7.5) || 0;
                     return $scope.newQuestion.words;
+                };
+
+                $scope.calculateMaxPoints = function (question) {
+                    return questionService.calculateMaxPoints(question);
                 };
 
                 var update = function (displayErrors) {
@@ -142,6 +150,7 @@
                             break;
 
                         case 'MultipleChoiceQuestion':
+                        case 'WeightedMultipleChoiceQuestion':
                             questionToUpdate.options = $scope.newQuestion.options;
                             break;
                     }
@@ -161,7 +170,10 @@
                 };
 
                 $scope.deleteQuestion = function () {
-                    var dialog = dialogs.confirm($translate.instant('sitnet_confirm'), $translate.instant('sitnet_remove_question_from_library_only'));
+                    var confirmation = $scope.newQuestion.state === 'NEW' ?
+                        'sitnet_confirm_question_removal' :
+                        'sitnet_remove_question_from_library_only';
+                    var dialog = dialogs.confirm($translate.instant('sitnet_confirm'), $translate.instant(confirmation));
                     dialog.result.then(function (btn) {
                         QuestionRes.questions.delete({'id': $scope.newQuestion.id}, function () {
                             toastr.info($translate.instant('sitnet_question_removed'));
@@ -248,15 +260,7 @@
 
                 $scope.addNewOption = function (newQuestion) {
 
-                    var option_description = $translate.instant('sitnet_default_option_description');
-
-                    var option = {
-                        "option": option_description,
-                        "correctOption": false,
-                        "score": 1
-                    };
-
-                    QuestionRes.options.create({qid: newQuestion.id}, option,
+                    QuestionRes.options.create({qid: newQuestion.id},
                         function (response) {
                             newQuestion.options.push(response);
                             toastr.info($translate.instant('sitnet_option_added'));
@@ -322,11 +326,11 @@
 
                     var question = $scope.newQuestion;
 
-                    var ctrl = function ($scope, $modalInstance) {
+                    var ctrl = ["$scope", "$modalInstance", function ($scope, $modalInstance) {
 
                         $scope.newQuestion = question;
                         $scope.isTeacherModal = true;
-                        fileService.getMaxFilesize().then(function(data) {
+                        fileService.getMaxFilesize().then(function (data) {
                             $scope.maxFileSize = data.filesize;
                         });
 
@@ -338,7 +342,7 @@
                             $modalInstance.dismiss('Canceled');
                         };
 
-                    };
+                    }];
 
                     var modalInstance = $modal.open({
                         templateUrl: EXAM_CONF.TEMPLATES_PATH + 'common/dialog_attachment_selection.html',

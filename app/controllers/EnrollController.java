@@ -34,9 +34,12 @@ public class EnrollController extends BaseController {
         List<Exam> exams = Ebean.find(Exam.class)
                 .fetch("creator", "firstName, lastName")
                 .fetch("examLanguages")
+                .fetch("examOwners", "firstName, lastName")
+                .fetch("examInspections.user", "firstName, lastName")
+                .fetch("course", "code, name")
                 .where()
                 .eq("course.code", code)
-                .eq("state", "PUBLISHED")
+                .eq("state", Exam.State.PUBLISHED)
                 .ge("examActiveEndDate", new Date())
                 .findList();
 
@@ -64,6 +67,7 @@ public class EnrollController extends BaseController {
         Exam exam = Ebean.find(Exam.class)
                 .fetch("course")
                 .fetch("course.organisation")
+                .fetch("course.gradeScale")
                 .fetch("gradeScale")
                 .fetch("creator", "firstName, lastName, email")
                 .fetch("examLanguages")
@@ -71,14 +75,16 @@ public class EnrollController extends BaseController {
                 .fetch("examInspections")
                 .fetch("examInspections.user")
                 .fetch("examType")
+                .fetch("executionType")
                 .where()
+                .eq("state", Exam.State.PUBLISHED)
                 .eq("course.code", code)
                 .idEq(id)
                 .findUnique();
 
-        //FIXME: should not be handled server-side
-        // Set general info visible
-        exam.setExpanded(true);
+        if (exam == null) {
+            return notFound("sitnet_error_exam_not_found");
+        }
         return ok(exam);
     }
 
@@ -96,7 +102,7 @@ public class EnrollController extends BaseController {
         DateTime now = AppUtil.adjustDST(new DateTime());
         List<ExamEnrolment> enrolments = Ebean.find(ExamEnrolment.class)
                 .where()
-                .eq("user.id", getLoggedUser().getId())
+                .eq("user", getLoggedUser())
                 .eq("exam.id", id)
                 .gt("exam.examActiveEndDate", now.toDate())
                 .disjunction()
@@ -104,8 +110,8 @@ public class EnrollController extends BaseController {
                 .isNull("reservation")
                 .endJunction()
                 .disjunction()
-                .eq("exam.state", "PUBLISHED")
-                .eq("exam.state", "STUDENT_STARTED")
+                .eq("exam.state", Exam.State.PUBLISHED)
+                .eq("exam.state", Exam.State.STUDENT_STARTED)
                 .endJunction()
                 .findList();
         if (enrolments.isEmpty()) {
@@ -116,7 +122,19 @@ public class EnrollController extends BaseController {
 
     @Restrict({@Group("ADMIN"), @Group("STUDENT")})
     public Result removeEnrolment(Long id) {
-        ExamEnrolment enrolment = Ebean.find(ExamEnrolment.class, id);
+        User user = getLoggedUser();
+        ExamEnrolment enrolment;
+        if (user.hasRole("STUDENT", getSession())) {
+            enrolment = Ebean.find(ExamEnrolment.class).fetch("exam")
+                    .where().idEq(id).eq("user", user).findUnique();
+        } else {
+            enrolment = Ebean.find(ExamEnrolment.class).fetch("exam")
+                    .where().idEq(id).findUnique();
+        }
+        // Disallow removing enrolments to private exams created automatically for student
+        if (enrolment.getExam().isPrivate()) {
+            return forbidden();
+        }
         if (enrolment.getReservation() != null) {
             return forbidden("sitnet_cancel_reservation_first");
         }
@@ -124,9 +142,12 @@ public class EnrollController extends BaseController {
         return ok();
     }
 
-    @Restrict({@Group("ADMIN"), @Group("STUDENT")})
+    @Restrict({@Group("STUDENT")})
     public Result updateEnrolment(Long id) {
-        ExamEnrolment enrolment = Ebean.find(ExamEnrolment.class, id);
+        ExamEnrolment enrolment = Ebean.find(ExamEnrolment.class).where()
+                .idEq(id)
+                .eq("user", getLoggedUser())
+                .findUnique();
         if (enrolment == null) {
             return notFound("enrolment not found");
         }
@@ -137,11 +158,16 @@ public class EnrollController extends BaseController {
         return ok();
     }
 
-    private Result doCreateEnrolment(Long eid, Long uid) {
+    private Result doCreateEnrolment(Long eid, Long uid, ExamExecutionType.Type type) {
         User user = uid == null ? getLoggedUser() : Ebean.find(User.class, uid);
         Exam exam = Ebean.find(Exam.class)
                 .where()
                 .eq("id", eid)
+                .disjunction()
+                .eq("state", Exam.State.PUBLISHED)
+                .ne("executionType.type", ExamExecutionType.Type.PUBLIC.toString())
+                .endJunction()
+                .eq("executionType.type", type.toString())
                 .findUnique();
         if (exam == null) {
             return notFound("sitnet_error_exam_not_found");
@@ -159,7 +185,7 @@ public class EnrollController extends BaseController {
                 .disjunction()
                 .conjunction()
                 .eq("exam.parent.id", exam.getId())
-                .eq("exam.state", Exam.State.STUDENT_STARTED.toString())
+                .eq("exam.state", Exam.State.STUDENT_STARTED)
                 .endJunction()
                 .endJunction()
                 .endJunction()
@@ -172,10 +198,10 @@ public class EnrollController extends BaseController {
                 return forbidden("sitnet_error_enrolment_exists");
             } else if (reservation.toInterval().contains(AppUtil.adjustDST(DateTime.now(), reservation))) {
                 // reservation in effect
-                if (exam.getState().equals(Exam.State.STUDENT_STARTED.toString())) {
+                if (exam.getState() == Exam.State.STUDENT_STARTED) {
                     // exam for reservation is ongoing
                     return forbidden("sitnet_reservation_in_effect");
-                } else if (exam.getState().equals(Exam.State.PUBLISHED.toString())) {
+                } else if (exam.getState() == Exam.State.PUBLISHED) {
                     // exam for reservation not started (yet?)
                     return forbidden("sitnet_reservation_in_effect");
                 }
@@ -191,13 +217,13 @@ public class EnrollController extends BaseController {
     @Restrict({@Group("ADMIN"), @Group("STUDENT")})
     public F.Promise<Result> createEnrolment(final String code, final Long id) throws MalformedURLException {
         if (!PERM_CHECK_ACTIVE) {
-            return wrapAsPromise(doCreateEnrolment(id, null));
+            return wrapAsPromise(doCreateEnrolment(id, null, ExamExecutionType.Type.PUBLIC));
         }
         final User user = getLoggedUser();
         F.Promise<Collection<String>> promise = externalAPI.getPermittedCourses(user);
         return promise.map(codes -> {
             if (codes.contains(code)) {
-                return doCreateEnrolment(id, null);
+                return doCreateEnrolment(id, null, ExamExecutionType.Type.PUBLIC);
             } else {
                 Logger.warn("Attempt to enroll for a course without permission from {}", user.toString());
                 return forbidden("sitnet_error_access_forbidden");
@@ -207,7 +233,8 @@ public class EnrollController extends BaseController {
 
     @Restrict({@Group("ADMIN"), @Group("TEACHER")})
     public Result createStudentEnrolment(Long eid, Long uid) {
-        return doCreateEnrolment(eid, uid);
+        Exam exam = Ebean.find(Exam.class, eid);
+        return doCreateEnrolment(eid, uid, ExamExecutionType.Type.valueOf(exam.getExecutionType().getType()));
     }
 
     @Restrict({@Group("ADMIN"), @Group("TEACHER")})
@@ -215,11 +242,11 @@ public class EnrollController extends BaseController {
         User user = getLoggedUser();
         ExamEnrolment enrolment = Ebean.find(ExamEnrolment.class).where()
                 .idEq(id)
-                .eq("exam.executionType.type", ExamExecutionType.Type.PRIVATE.toString())
+                .ne("exam.executionType.type", ExamExecutionType.Type.PUBLIC.toString())
                 .isNull("reservation")
                 .disjunction()
-                .eq("exam.state", Exam.State.DRAFT.toString())
-                .eq("exam.state", Exam.State.SAVED.toString())
+                .eq("exam.state", Exam.State.DRAFT)
+                .eq("exam.state", Exam.State.SAVED)
                 .endJunction()
                 .disjunction()
                 .eq("exam.examOwners", user)

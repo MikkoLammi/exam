@@ -1,35 +1,33 @@
-(function() {
+(function () {
 
     "use strict";
 
     angular.module('exam.services')
 
-        .factory('DragDropHandler', [function() {
+        .factory('DragDropHandler', [function () {
             return {
                 dragObject: undefined,
-                addObject: function(object, objects, to) {
+                addObject: function (object, objects, to) {
                     objects.splice(to, 0, object);
-                },
-                moveObject: function(objects, from, to) {
-                    objects.splice(to, 0, objects.splice(from, 1)[0]);
                 }
             };
         }])
 
-        .directive('draggable', ['DragDropHandler', function(DragDropHandler) {
+        .directive('draggable', ['DragDropHandler', function (DragDropHandler) {
             return {
                 scope: {
                     draggable: '='
                 },
-                link: function(scope, element, attrs) {
+                link: function (scope, element, attrs) {
                     element.draggable({
                         connectToSortable: attrs.draggableTarget,
                         helper: "clone",
                         revert: "invalid",
-                        start: function() {
+                        appendTo: "body",
+                        start: function () {
                             DragDropHandler.dragObject = scope.draggable;
                         },
-                        stop: function() {
+                        stop: function () {
                             DragDropHandler.dragObject = undefined;
                         }
                     });
@@ -39,35 +37,64 @@
             };
         }])
 
-        .directive('droppable', ['DragDropHandler', function(DragDropHandler) {
+        .directive('droppable', ['DragDropHandler', '$translate', function (DragDropHandler, $translate) {
             return {
                 scope: {
+                    identifier: '=',
                     droppable: '=',
                     ngMove: '&',
                     ngCreate: '&'
                 },
-                link: function(scope, element, attrs) {
-                    element.sortable({
-                        connectWith: ['.draggable', '.sortable']
-                    });
-                    element.disableSelection();
-                    element.on("sortdeactivate", function(event, ui) {
-                        var from = (angular.element(ui.item).scope()) ? angular.element(ui.item).scope().$index : undefined;
-                        var to = element.children().index(ui.item);
+                link: function (scope, element, attrs) {
 
-                        if (to >= 0 && (from != to || DragDropHandler.dragObject)) {
-                            scope.$apply(function() {
-                                if (from >= 0 && !DragDropHandler.dragObject) {
-                                    //item is coming from this sortable
-                                    scope.ngMove({from: from, to: to});
-                                } else if (DragDropHandler.dragObject) {
-                                    //item is dragged from elsewhere
-                                    scope.ngCreate({
-                                        object: DragDropHandler.dragObject,
-                                        to: to
-                                    });
-                                    ui.item.remove();
-                                }
+                    // variables used for dnd
+                    var toUpdate;
+                    var startIndex = -1;
+                    scope.$watch('droppable', function (value) {
+                        toUpdate = value;
+                    }, true);
+
+                    element.droppable({
+                        drop: function (event, ui) {
+                            if (!ui.draggable.hasClass('draggable') && !ui.draggable.hasClass('sortable-' + scope.identifier)) {
+                                toastr.warning($translate.instant('sitnet_move_between_sections_disabled'));
+                            }
+                        }
+                    });
+
+                    // use jquery to make the element sortable. This is called
+                    // when the element is rendered
+                    element.sortable({
+                        items: '.sortable-' + scope.identifier,
+                        start: function (event, ui) {
+                            // on start we define where the item is dragged from
+                            startIndex = ($(ui.item).index());
+                        },
+                        stop: function (event, ui) {
+                            // on stop we determine the new index of the
+                            // item and store it there
+                            var newIndex = ($(ui.item).index());
+                            var toMove = toUpdate[startIndex];
+                            toUpdate.splice(startIndex, 1);
+                            toUpdate.splice(newIndex, 0, toMove);
+
+                            // we move items in the array, propagete update to angular as well
+                            // since we're outside angulars lifecycle
+                            scope.ngMove({from: startIndex, to: newIndex});
+                        },
+                        axis: 'y'
+                    });
+
+                    element.disableSelection();
+                    element.on("sortdeactivate", function (event, ui) {
+                        var to = element.children().index(ui.item);
+                        if (DragDropHandler.dragObject && to > -1) {
+                            scope.$apply(function () {
+                                scope.ngCreate({
+                                    object: DragDropHandler.dragObject,
+                                    to: to
+                                });
+                                ui.item.remove();
                             });
                         }
                     });

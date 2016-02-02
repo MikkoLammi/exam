@@ -3,24 +3,18 @@
     angular.module("exam.resources")
         .factory("StudentExamRes", ['$resource', function ($resource) {
             return {
-                exams: $resource("/student/exams/:id",
+                examInfo: $resource("/student/exam/:eid", {eid: "@eid"}),
+                exams: $resource("/student/exams/:hash",
                 {
-                    id: "@id"
+                    hash: "@hash"
                 },
                 {
                     "update": {
                         method: "PUT",
-                        params: { id: "@id" }}
+                        params: { hash: "@hash" }}
                 }),
 
-                finishedExams: $resource("/student/finishedexams/:uid",
-                {
-                    uid: "@uid"
-                },
-                {
-                    "get": {method: "GET", params: { uid: "@uid" }}
-                }),
-
+                finishedExams: $resource("/student/finishedexams"),
                 enrolments: $resource("/enrolments"),
                 enrolment: $resource("/enrolments/:eid",
                 {
@@ -31,14 +25,14 @@
                     "update": {method: "PUT", params: { eid: "@eid" }}
                 }),
 
-                exam: $resource("/student/exam/abort/:id",
+                exam: $resource("/student/exam/abort/:hash",
                 {
-                    id: "@id"
+                    hash: "@hash"
                 },
                 {
                     "abort": {
                         method: "PUT",
-                        params: { id: "@id" }}
+                        params: { hash: "@hash" }}
                 }),
 
                 feedback: $resource("/feedback/exams/:eid",
@@ -48,14 +42,14 @@
                 {
                     "get": {method: "GET", params: { eid: "@eid" }}
                 }),
-
-                multipleChoiseAnswer: $resource("/student/exams/:hash/question/:qid/option/:oid",
+                scores: $resource("/feedback/exams/:eid/score", {eid: "@eid"}),
+                multipleChoiceAnswer: $resource("/student/exams/:hash/question/:qid/option/:oids",
                 {
-                    hash: "@hash", qid: "@qid", oid: "@oid"
+                    hash: "@hash", qid: "@qid", oid: "@oids"
                 },
                 {
                     "saveMultipleChoice": {
-                        method: "POST", params: { hash: "@hash", qid: "@qid", oid: "@oid" }
+                        method: "POST", params: { hash: "@hash", qid: "@qid", oids: "@oids" }
                     }
                 }),
 

@@ -12,6 +12,8 @@ import play.mvc.Http;
 import play.mvc.Result;
 import play.mvc.Results;
 
+import javax.persistence.OptimisticLockException;
+
 public class SystemErrorHandler implements HttpErrorHandler {
 
     @Override
@@ -34,17 +36,21 @@ public class SystemErrorHandler implements HttpErrorHandler {
         return F.Promise.promise(() -> {
             Throwable cause = exception.getCause();
             String errorMessage = cause == null ? exception.getMessage() : cause.getMessage();
-
             Logger.debug("onServerError: URL: {}, msg: {}", request.uri(), errorMessage);
-
-            if (cause instanceof AuthenticateException) {
-                return Results.unauthorized(Json.toJson(errorMessage));
+            exception.printStackTrace();
+            if (cause != null) {
+                if (cause instanceof AuthenticateException) {
+                    return Results.unauthorized(Json.toJson(errorMessage));
+                }
+                if (cause instanceof MalformedDataException) {
+                    return Results.badRequest(Json.toJson(errorMessage));
+                }
+                if (cause instanceof IllegalArgumentException) {
+                    return Results.badRequest(Json.toJson(new ApiError(errorMessage)));
+                }
             }
-            if (cause instanceof MalformedDataException) {
-                return Results.badRequest(Json.toJson(errorMessage));
-            }
-            if (cause instanceof IllegalArgumentException) {
-                return Results.badRequest(Json.toJson(new ApiError(errorMessage)));
+            if (exception instanceof OptimisticLockException) {
+                return Results.badRequest("sitnet_error_data_has_changed");
             }
             return Results.internalServerError(Json.toJson(new ApiError(errorMessage)));
         });

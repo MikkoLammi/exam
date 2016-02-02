@@ -2,8 +2,9 @@
     'use strict';
     angular.module("exam.controllers")
         .controller('ReservationCtrl', ['ExamRes', '$scope', '$location', '$http', 'EXAM_CONF',
-            'ReservationResource', 'dateService', 'examService', '$timeout', '$routeParams',
-            function (ExamRes, $scope, $location, $http, EXAM_CONF, ReservationResource, dateService, examService, $timeout, $routeParams) {
+            'ReservationResource', 'dateService', 'examService', '$timeout', '$routeParams', '$translate',
+            function (ExamRes, $scope, $location, $http, EXAM_CONF, ReservationResource, dateService, examService,
+                      $timeout, $routeParams, $translate) {
 
                 $scope.dateService = dateService;
 
@@ -78,6 +79,8 @@
                     'REVIEW_STARTED',
                     'GRADED',
                     'GRADED_LOGGED',
+                    'REJECTED',
+                    'ARCHIVED',
                     'STUDENT_STARTED',
                     'PUBLISHED',
                     'ABORTED',
@@ -85,14 +88,10 @@
                 ];
 
                 $scope.printExamState = function (enrolment) {
-                    if (moment(enrolment.reservation.endAt).isBefore(moment()) && !enrolment.exam.parent) {
-                        return "NO_SHOW";
-                    } else {
-                        return enrolment.exam.state;
-                    }
+                    return enrolment.reservation.noShow ? 'NO_SHOW' : enrolment.exam.state;
                 };
 
-                function initQuery() {
+                $scope.query = function () {
                     // Teacher not required to specify time ranges
                     if (!$scope.isAdminView() || ($scope.dateService.startDate && $scope.dateService.endDate)) {
                         var params = $scope.selection;
@@ -103,8 +102,10 @@
                             }
                         }
 
+                        var tzOffset = new Date().getTimezoneOffset() * 60000;
+
                         if ($scope.dateService.startDate) {
-                            params.start = Date.parse($scope.dateService.startDate);
+                            params.start = Date.parse($scope.dateService.startDate) + tzOffset;
                         }
                         if ($scope.dateService.endDate) {
                             params.end = Date.parse($scope.dateService.endDate);
@@ -112,46 +113,40 @@
 
                         ReservationResource.reservations.query(params,
                             function (enrolments) {
-                                angular.forEach(enrolments, function (enrolment) {
-                                    examService.setExamOwnersAndInspectors(enrolment.exam, true);
+                                enrolments.forEach(function (e) {
+                                    e.userAggregate = e.user.lastName + e.user.firstName;
+                                    var exam = e.exam.parent || e.exam;
+                                    e.teacherAggregate = exam.examOwners.map(function (o) {
+                                        return o.lastName + o.firstName;
+                                    }).join();
+                                    var state = $scope.printExamState(e);
+                                    e.stateOrd = ['PUBLISHED', 'NO_SHOW', 'STUDENT_STARTED', 'ABORTED', 'REVIEW',
+                                        'REVIEW_STARTED', 'GRADED', 'GRADED_LOGGED', 'REJECTED', 'ARCHIVED'].indexOf(state);
                                 });
                                 $scope.enrolments = enrolments;
                             }, function (error) {
                                 toastr.error(error.data);
                             });
                     }
-                }
-
-                $timeout(initQuery, 500);
-
-                $scope.query = function () {
-                    initQuery();
                 };
 
                 $scope.removeReservation = function (enrolment) {
                     ReservationResource.reservation.remove({id: enrolment.reservation.id}, null,
                         function () {
                             $scope.enrolments.splice($scope.enrolments.indexOf(enrolment), 1);
-                            $location.path("admin/reservations/");
+                            toastr.info($translate.instant('sitnet_reservation_removed'));
                         }, function (error) {
                             toastr.error(error.data);
                         });
                 };
 
-                $scope.sort = {
-                    column: 'reservation.startAt',
-                    order: false
-                };
+                $scope.permitRetrial = function (reservation) {
+                    ExamRes.reservation.update({id: reservation.id}, function () {
+                        reservation.retrialPermitted = true;
+                        toastr.info($translate.instant('sitnet_retrial_permitted'));
+                    });
+                }
 
-                $scope.toggleSort = function (value) {
-                    if ($scope.sort.column == value) {
-                        $scope.sort.order = !$scope.sort.order;
-                        return;
-                    }
-
-                    $scope.sort.column = value;
-                    $scope.sort.order = !$scope.sort.order;
-                };
             }
         ])
     ;

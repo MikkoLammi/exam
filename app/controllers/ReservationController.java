@@ -4,6 +4,7 @@ import be.objectify.deadbolt.java.actions.Group;
 import be.objectify.deadbolt.java.actions.Restrict;
 import com.avaje.ebean.Ebean;
 import com.avaje.ebean.ExpressionList;
+import com.avaje.ebean.FetchConfig;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -18,8 +19,8 @@ import util.java.EmailComposer;
 import javax.inject.Inject;
 import java.io.IOException;
 import java.util.Date;
-import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 
 public class ReservationController extends BaseController {
@@ -34,10 +35,10 @@ public class ReservationController extends BaseController {
                 .select("id, name")
                 .where()
                 .isNull("parent") // only Exam prototypes
-                .eq("state", Exam.State.PUBLISHED.toString())
-                .gt("examActiveEndDate", new Date());
-        if (user.hasRole("TEACHER")) {
-            el = el.disjunction()
+                .eq("state", Exam.State.PUBLISHED);
+        if (user.hasRole("TEACHER", getSession())) {
+            el = el.gt("examActiveEndDate", new Date())
+                    .disjunction()
                     .eq("creator", user)
                     .eq("examOwners", user)
                     .eq("examInspections.user", user)
@@ -54,6 +55,24 @@ public class ReservationController extends BaseController {
         return ok(examRooms);
     }
 
+    private ArrayNode asJson(List<User> users) {
+        ArrayNode array = JsonNodeFactory.instance.arrayNode();
+        for (User u : users) {
+            String name = String.format("%s %s", u.getFirstName(), u.getLastName());
+            if (u.getUserIdentifier() != null) {
+                name += String.format(" (%s)", u.getUserIdentifier());
+            }
+            ObjectNode part = Json.newObject();
+            part.put("id", u.getId());
+            part.put("firstName", u.getFirstName());
+            part.put("lastName", u.getLastName());
+            part.put("userIdentifier", u.getUserIdentifier());
+            part.put("name", name);
+            array.add(part);
+        }
+        return array;
+    }
+
     @Restrict({@Group("ADMIN"), @Group("TEACHER")})
     public Result getStudents() {
 
@@ -61,39 +80,29 @@ public class ReservationController extends BaseController {
                 .where()
                 .eq("roles.name", "STUDENT")
                 .findList();
-
-        ArrayNode array = JsonNodeFactory.instance.arrayNode();
-        for (User u : students) {
-            ObjectNode part = Json.newObject();
-            part.put("id", u.getId());
-            part.put("firstName", u.getFirstName());
-            part.put("lastName", u.getLastName());
-            part.put("name", String.format("%s %s", u.getFirstName(), u.getLastName()));
-            array.add(part);
-        }
-
-        return ok(Json.toJson(array));
+        return ok(Json.toJson(asJson(students)));
     }
 
     @Restrict({@Group("ADMIN")})
     public Result getTeachers() {
 
-        List<User> students = Ebean.find(User.class)
+        List<User> teachers = Ebean.find(User.class)
                 .where()
                 .eq("roles.name", "TEACHER")
                 .findList();
 
-        ArrayNode array = JsonNodeFactory.instance.arrayNode();
-        for (User u : students) {
-            ObjectNode part = Json.newObject();
-            part.put("id", u.getId());
-            part.put("firstName", u.getFirstName());
-            part.put("lastName", u.getLastName());
-            part.put("name", String.format("%s %s", u.getFirstName(), u.getLastName()));
-            array.add(part);
-        }
+        return ok(Json.toJson(asJson(teachers)));
+    }
 
-        return ok(Json.toJson(array));
+    @Restrict({@Group("TEACHER"), @Group("ADMIN")})
+    public Result permitRetrial(Long id) {
+        Reservation reservation = Ebean.find(Reservation.class, id);
+        if (reservation == null) {
+            return notFound("sitnet_not_found");
+        }
+        reservation.setRetrialPermitted(true);
+        reservation.update();
+        return ok();
     }
 
     @Restrict({@Group("ADMIN")})
@@ -137,21 +146,21 @@ public class ReservationController extends BaseController {
         ExpressionList<ExamEnrolment> query = Ebean.find(ExamEnrolment.class)
                 .fetch("user", "id, firstName, lastName, email, userIdentifier")
                 .fetch("exam", "id, name, state")
-                .fetch("exam.examOwners", "id, firstName, lastName")
-                .fetch("exam.parent", "id")
-                .fetch("exam.examInspections", "id")
+                .fetch("exam.course", "code")
+                .fetch("exam.examOwners", "id, firstName, lastName", new FetchConfig().query())
+                .fetch("exam.parent.examOwners", "id, firstName, lastName",  new FetchConfig().query())
                 .fetch("exam.examInspections.user", "id, firstName, lastName")
-                .fetch("reservation", "startAt, endAt")
+                .fetch("reservation", "startAt, endAt, noShow")
                 .fetch("reservation.machine", "id, name, ipAddress, otherIdentifier")
                 .fetch("reservation.machine.room", "id, name, roomCode")
-                .where();
+                .where()
+                .ne("exam.state", Exam.State.DELETED);
 
         User user = getLoggedUser();
-        if (user.hasRole("TEACHER")) {
+        if (user.hasRole("TEACHER", getSession())) {
             query = query.disjunction()
+                    .eq("exam.parent.examOwners", user)
                     .eq("exam.examOwners", user)
-                    .eq("exam.creator", user)
-                    .eq("exam.parent.creator", user)
                     .endJunction();
         }
 
@@ -167,8 +176,15 @@ public class ReservationController extends BaseController {
             query = query.lt("reservation.endAt", endDate.toDate());
         }
 
-        if (state.isDefined() && !state.get().equals("NO_SHOW")) {
-            query = query.eq("exam.state", state.get());
+        if (state.isDefined()) {
+            if (!state.get().equals("NO_SHOW")) {
+                query = query.eq("exam.state", Exam.State.valueOf(state.get()));
+                if (state.get().equals(Exam.State.PUBLISHED.toString())) {
+                    query = query.eq("reservation.noShow", false);
+                }
+            } else {
+                query = query.eq("reservation.noShow", true);
+            }
         }
 
         if (studentId.isDefined()) {
@@ -184,37 +200,11 @@ public class ReservationController extends BaseController {
             query = query.disjunction().eq("exam.parent.id", examId.get()).eq("exam.id", examId.get()).endJunction();
         }
 
-        List<ExamEnrolment> enrolments = query.orderBy("reservation.startAt").findList();
-
-        if (enrolments == null) {
-            return notFound();
+        if (ownerId.isDefined() && user.hasRole("ADMIN", getSession())) {
+            Long userId = ownerId.get();
+            query = query.disjunction().eq("exam.examOwners.id", userId).eq("exam.parent.examOwners.id", userId).endJunction();
         }
-
-        if (ownerId.isDefined()) {
-            User owner = Ebean.find(User.class, ownerId.get());
-            Iterator<ExamEnrolment> it = enrolments.listIterator();
-            while (it.hasNext()) {
-                ExamEnrolment ee = it.next();
-                Exam exam = ee.getExam().getParent() == null ? ee.getExam() : ee.getExam().getParent();
-                if (!exam.getExamOwners().contains(owner)) {
-                    it.remove();
-                }
-            }
-        }
-
-        // Need to manually include/exclude the no-shows
-        if (state.isDefined()) {
-            Iterator<ExamEnrolment> it = enrolments.listIterator();
-            while (it.hasNext()) {
-                ExamEnrolment ee = it.next();
-                boolean isNoShow = ee.getExam().getParent() == null &&
-                        ee.getReservation().getEndAt().before(DateTime.now().toDate());
-                if (isNoShow != state.get().equals("NO_SHOW")) {
-                    it.remove();
-                }
-            }
-        }
-
+        Set<ExamEnrolment> enrolments = query.orderBy("reservation.startAt").findSet();
         return ok(enrolments);
     }
 }

@@ -35,7 +35,11 @@ public class ExamControllerTest extends IntegrationTestCase {
     public void testGetActiveExams() {
         // Setup
         List<Exam> activeExams = Ebean.find(Exam.class).where()
-                .eq("creator.id", userId).eq("state", Exam.State.PUBLISHED.toString()).findList();
+                .eq("creator.id", userId).eq("state", Exam.State.PUBLISHED).findList();
+        activeExams.stream().forEach(e -> {
+            e.getExamOwners().add(e.getCreator());
+            e.update();
+        });
         Set<Long> ids = new HashSet<>();
         for (Exam e : activeExams) {
             e.setExamActiveStartDate(new Date());
@@ -89,7 +93,7 @@ public class ExamControllerTest extends IntegrationTestCase {
         assertThat(draft.getName()).isNull();
         assertThat(draft.getCreator().getId()).isEqualTo(userId);
         assertThat(draft.getCreated()).isNotNull();
-        assertThat(draft.getState()).isEqualTo(Exam.State.DRAFT.toString());
+        assertThat(draft.getState()).isEqualTo(Exam.State.DRAFT);
         assertThat(draft.getExamSections().size()).isEqualTo(1);
         assertThat(draft.getExamSections().get(0).getName()).isNull();
         assertThat(draft.getExamSections().get(0).getExpanded()).isTrue();
@@ -143,7 +147,7 @@ public class ExamControllerTest extends IntegrationTestCase {
         // Setup
         long id = 1L;
         Exam expected = Ebean.find(Exam.class, id);
-        expected.setState(Exam.State.STUDENT_STARTED.toString());
+        expected.setState(Exam.State.STUDENT_STARTED);
         expected.update();
 
         // Execute
@@ -161,7 +165,7 @@ public class ExamControllerTest extends IntegrationTestCase {
     }
 
     private String[] getExamSectionFieldsOfExam(String index) {
-        String[] fields = {"name", "totalScore", "id", "expanded", "lotteryOn", "lotteryItemCount"};
+        String[] fields = {"name", "id", "expanded", "lotteryOn", "lotteryItemCount"};
         for (int i = 0; i < fields.length; ++i) {
             fields[i] = "examSections[" + index + "]." + fields[i];
         }

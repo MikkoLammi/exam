@@ -2,6 +2,8 @@ package base;
 
 import com.avaje.ebean.Ebean;
 import com.avaje.ebean.EbeanServer;
+import com.avaje.ebean.TxType;
+import com.avaje.ebean.annotation.Transactional;
 import com.avaje.ebean.config.ServerConfig;
 import com.avaje.ebean.config.dbplatform.PostgresPlatform;
 import com.avaje.ebeaninternal.api.SpiEbeanServer;
@@ -11,24 +13,30 @@ import com.google.common.collect.ImmutableMap;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.PathNotFoundException;
-import org.junit.*;
+import models.*;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.rules.TestName;
 import play.Application;
-import play.db.evolutions.Evolutions;
 import play.db.Database;
 import play.db.Databases;
+import play.db.evolutions.Evolutions;
 import play.libs.Json;
+import play.libs.Yaml;
 import play.mvc.Http;
 import play.mvc.Result;
 import play.test.Helpers;
-import util.AppUtil;
 
+import javax.persistence.PersistenceException;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.net.URLEncoder;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.fest.assertions.Assertions.assertThat;
 import static play.test.Helpers.contentAsString;
@@ -43,7 +51,8 @@ public class IntegrationTestCase {
     private static final Map<String, String> HAKA_HEADERS = new HashMap<>();
 
     static {
-        HAKA_HEADERS.put("displayName", "George");
+        HAKA_HEADERS.put("givenName", "George");
+        HAKA_HEADERS.put("displayName", "George Lazenby");
         HAKA_HEADERS.put("eppn", "george.lazenby@funet.fi");
         HAKA_HEADERS.put("sn", "Lazenby");
         HAKA_HEADERS.put("preferredLanguage", "fi");
@@ -52,6 +61,7 @@ public class IntegrationTestCase {
         HAKA_HEADERS.put("unscoped-affiliation", "member;employee;faculty");
         HAKA_HEADERS.put("employeeNumber", "12345");
         HAKA_HEADERS.put("schacPersonalUniqueCode", "12345");
+        HAKA_HEADERS.put("homeOrganisation", "oulu.fi");
         try {
             HAKA_HEADERS.put("logouturl", URLEncoder.encode("https://logout.foo.bar.com?returnUrl=" +
                     URLEncoder.encode("http://foo.bar.com", "UTF-8"), "UTF-8"));
@@ -65,7 +75,7 @@ public class IntegrationTestCase {
     public TestName currentTest = new TestName();
 
     private Database getDB() {
-        return  Databases.createFrom("org.postgresql.Driver", "jdbc:postgresql://localhost/sitnet_test",
+        return Databases.createFrom("org.postgresql.Driver", "jdbc:postgresql://localhost/sitnet_test",
                 ImmutableMap.of("user", "sitnet", "password", "sitnetsitnet"));
     }
 
@@ -91,7 +101,7 @@ public class IntegrationTestCase {
         cleanEvolvedTables(db);
         db.shutdown();
 
-        AppUtil.initializeDataModel();
+        addTestData();
 
         Method testMethod = getClass().getDeclaredMethod(currentTest.getMethodName());
         if (testMethod.isAnnotationPresent(RunAsStudent.class)) {
@@ -139,7 +149,7 @@ public class IntegrationTestCase {
     }
 
     protected Result request(String method, String path, JsonNode body) {
-        return request(method, path, body, Collections.<String, String>emptyMap());
+        return request(method, path, body, HAKA_HEADERS);
     }
 
     protected Result request(String method, String path, JsonNode body, Map<String, String> headers) {
@@ -150,22 +160,19 @@ public class IntegrationTestCase {
         if (body != null && !method.equals(Helpers.GET)) {
             request = request.bodyJson(body);
         }
-        if (sessionToken != null) {
-            request.headers().put("x-exam-authentication", new String[]{sessionToken});
-        }
         return Helpers.route(request);
     }
 
     protected void loginAsStudent() {
-        login("saulistu@funet.fi");
+        login("student@funet.fi");
     }
 
     protected void loginAsTeacher() {
-        login("maikaope@funet.fi");
+        login("teacher@funet.fi");
     }
 
     protected void loginAsAdmin() {
-        login("sitnetad@funet.fi");
+        login("admin@funet.fi");
     }
 
     protected void login(String eppn) {
@@ -239,6 +246,78 @@ public class IntegrationTestCase {
 
     private boolean isIndefinite(String path) {
         return path.contains("..") || path.contains("?(") || path.matches(".*(\\d+ *,)+.*");
+    }
+
+    private static void addTestUsers(Map<String, List<Object>> sources) {
+        sources.get("users").stream().map(User.class::cast).collect(Collectors.toList()).forEach(u -> {
+            String uname = u.getEppn().split("@")[0];
+            Role student = Ebean.find(Role.class).where().eq("name", Role.Name.STUDENT.toString()).findUnique();
+            Role teacher = Ebean.find(Role.class).where().eq("name", Role.Name.TEACHER.toString()).findUnique();
+            Role admin = Ebean.find(Role.class).where().eq("name", Role.Name.ADMIN.toString()).findUnique();
+            switch (uname) {
+                case "student":
+                    u.getRoles().add(student);
+                    break;
+                case "teacher":
+                    u.getRoles().add(teacher);
+                    break;
+                case "admin":
+                    u.getRoles().add(admin);
+                    break;
+            }
+            u.save();
+        });
+    }
+
+    @Transactional(type = TxType.REQUIRES_NEW)
+    @SuppressWarnings("unchecked")
+    public static void addTestData() {
+        int userCount;
+        try {
+            userCount = Ebean.find(User.class).findRowCount();
+        } catch (PersistenceException e) {
+            // Tables are likely not there yet, skip this.
+            return;
+        }
+        if (userCount == 0) {
+            Map<String, List<Object>> all = (Map<String, List<Object>>) Yaml.load("initial-data.yml");
+            if (Ebean.find(Language.class).findRowCount() == 0) { // Might already be inserted by evolution
+                Ebean.save(all.get("languages"));
+            }
+            Ebean.save(all.get("organisations"));
+            Ebean.save(all.get("attachments"));
+
+            addTestUsers(all);
+
+            if (Ebean.find(GradeScale.class).findRowCount() == 0) { // Might already be inserted by evolution
+                Ebean.save(all.get("grade-scales"));
+            }
+            if (Ebean.find(Grade.class).findRowCount() == 0) { // Might already be inserted by evolution
+                Ebean.save(all.get("grades"));
+            }
+            Ebean.save(all.get("question_essay"));
+            Ebean.save(all.get("question_multiple_choice"));
+            Ebean.save(all.get("softwares"));
+            Ebean.save(all.get("courses"));
+            Ebean.save(all.get("comments"));
+            for (Object o : all.get("exams")) {
+                Exam e = (Exam) o;
+                e.setExecutionType(Ebean.find(ExamExecutionType.class, 1));
+                e.generateHash();
+                e.save();
+            }
+            Ebean.save(all.get("exam-sections"));
+            Ebean.save(all.get("section-questions"));
+            Ebean.save(all.get("exam-participations"));
+            Ebean.save(all.get("exam-inspections"));
+            Ebean.save(all.get("mail-addresses"));
+            Ebean.save(all.get("calendar-events"));
+            Ebean.save(all.get("exam-rooms"));
+            Ebean.save(all.get("exam-machines"));
+            Ebean.save(all.get("exam-room-reservations"));
+            Ebean.save(all.get("exam-enrolments"));
+            Ebean.save(all.get("question_multiple_choice"));
+        }
     }
 
 }

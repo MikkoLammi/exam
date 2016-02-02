@@ -1,22 +1,21 @@
+@import "fonts";
 @import "partial/defines";
 @import "partial/customization/hy/vmenu"; // HY CUSTOMIZATION
 @import "partial/customization/hy/header"; // HY CUSTOMIZATION
 @import "partial/exam";
 @import "partial/login";
-@import "partial/tables";
 @import "partial/library";
 @import "partial/question-editor";
 @import "partial/question-listing";
 @import "partial/student_exam";
 @import "partial/dialog";
-@import "partial/reservation";
 @import "partial/room";
 @import "partial/dashboard";
 @import "partial/form-validation";
-@import "partial/calendar";
-@import "partial/settings";
 @import "partial/print";
 @import "partial/datetimepicker";
+@import "partial/feedback";
+@import "partial/mainview";
 @import "partial/customization/hy/hy"; // HY CUSTOMIZATION
 
 .essay-dialog .modal-dialog {
@@ -26,12 +25,19 @@
 }
 
 html {
-  font-family: $font;
+  font-family: $sitnet-family-opensans;
 }
 
 body {
   background-color: $sitnet-background;
-  font-family: $font;
+  font-family: $sitnet-family-opensans;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: $sitnet-family-opensans;
+}
+p {
+  font-family: $sitnet-family-opensans;
 }
 
 .vmenu-on {
