@@ -11,13 +11,22 @@
                     {type: 'STUDENT', name: 'sitnet_student', icon: 'fa-graduation-cap'}
                 ];
 
+                UserRes.permissions.query(function (permissions) {
+                    permissions.forEach(function (p) {
+                        if (p.type === 'CAN_INSPECT_LANGUAGE') {
+                            p.name = 'sitnet_can_inspect_language';
+                            p.icon = 'fa-pencil';
+                        }
+                    });
+                    $scope.permissions = permissions;
+                });
+
+
                 $scope.loader = {
                     loading: false
                 };
 
-                var searching;
-
-                var updateEditOptions = function(user) {
+                var updateEditOptions = function (user) {
                     user.availableRoles = [];
                     user.removableRoles = [];
                     $scope.roles.forEach(function (role) {
@@ -29,15 +38,25 @@
                             user.removableRoles.push(angular.copy(role));
                         }
                     });
+                    user.availablePermissions = [];
+                    user.removablePermissions = [];
+                    $scope.permissions.forEach(function (permission) {
+                        if (user.permissions.map(function (p) {
+                                return p.type;
+                            }).indexOf(permission.type) === -1) {
+                            user.availablePermissions.push(angular.copy(permission));
+                        } else {
+                            user.removablePermissions.push(angular.copy(permission));
+                        }
+                    });
                 };
 
-                var doSearch = function () {
+                var search = function () {
                     UserRes.users.query({filter: $scope.filter.text}, function (users) {
                         $scope.users = users;
                         $scope.users.forEach(function (user) {
                             updateEditOptions(user);
                         });
-                        searching = false;
                         $scope.loader.loading = false;
                     }, function (err) {
                         $scope.loader.loading = false;
@@ -46,21 +65,31 @@
                 };
 
                 $scope.search = function () {
-                    // add a bit of delay so we don't hit the server that often
-                    if (!searching) {
-                        $scope.loader.loading = true;
-                        $timeout(doSearch, 200);
-                        searching = true;
-                    }
+                    $scope.loader.loading = true;
+                    search();
                 };
 
                 $scope.hasRole = function (user, role) {
-                    return sessionService.hasRole(user, role);
+                    return user.roles.some(function (r) {
+                        return r.name === role;
+                    });
                 };
 
-                $scope.applyFilter = function (role) {
+                $scope.hasPermission = function (user, permission) {
+                    return user.permissions.some(function (p) {
+                        return p.type === permission;
+                    });
+                };
+
+                $scope.applyRoleFilter = function (role) {
                     $scope.roles.forEach(function (r) {
                         r.filtered = r.type === role.type ? !r.filtered : false;
+                    });
+                };
+
+                $scope.applyPermissionFilter = function (permission) {
+                    $scope.permissions.forEach(function (p) {
+                        p.filtered = p.type === permission.type ? !p.filtered : false;
                     });
                 };
 
@@ -74,10 +103,21 @@
                         function (role) {
                             return role.filtered;
                         }).forEach(function (role) {
-                            if (!sessionService.hasRole(user, role.type)) {
-                                result = false;
-                            }
-                        });
+                        if (!$scope.hasRole(user, role.type)) {
+                            result = false;
+                        }
+                    });
+                    if (!result) {
+                        return result;
+                    }
+                    $scope.permissions.filter(
+                        function (permission) {
+                            return permission.filtered;
+                        }).forEach(function (permission) {
+                        if (!$scope.hasPermission(user, permission.type)) {
+                            result = false;
+                        }
+                    });
                     return result;
                 };
 
@@ -88,9 +128,16 @@
                     })
                 };
 
+                $scope.addPermission = function (user, permission) {
+                    UserRes.permissions.add({id: user.id, permission: permission.type}, function () {
+                        user.permissions.push({type: permission.type});
+                        updateEditOptions(user);
+                    })
+                };
+
                 $scope.removeRole = function (user, role) {
                     UserRes.userRoles.remove({id: user.id, role: role.type}, function () {
-                        var i = user.roles.map(function(r) {
+                        var i = user.roles.map(function (r) {
                             return r.name
                         }).indexOf(role.type);
                         user.roles.splice(i, 1);
@@ -98,7 +145,15 @@
                     })
                 };
 
-                $scope.search();
+                $scope.removePermission = function (user, permission) {
+                    UserRes.permissions.remove({id: user.id, permission: permission.type}, function () {
+                        var i = user.permissions.map(function (p) {
+                            return p.type;
+                        }).indexOf(permission.type);
+                        user.permissions.splice(i, 1);
+                        updateEditOptions(user);
+                    })
+                };
             }
         ]);
 })();

@@ -11,4 +11,11 @@ public abstract class VersionedModel extends Model {
     @Version
     protected long objectVersion;
 
+    public long getObjectVersion() {
+        return objectVersion;
+    }
+
+    public void setObjectVersion(long objectVersion) {
+        this.objectVersion = objectVersion;
+    }
 }

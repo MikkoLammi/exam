@@ -21,7 +21,6 @@ import util.java.EmailComposer;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.io.IOException;
 import java.util.List;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
@@ -102,12 +101,12 @@ public class SystemInitializer {
                 .withSecondOfMinute(0)
                 .plusWeeks(now.getDayOfWeek() == DateTimeConstants.MONDAY ? 0 : 1)
                 .withDayOfWeek(DateTimeConstants.MONDAY);
-        // Check if default TZ has daylight saving in effect, need to adjust the hour offset in that case
-        if (!AppUtil.getDefaultTimeZone().isStandardOffset(System.currentTimeMillis())) {
-            nextRun = nextRun.minusHours(1);
-        }
         if (nextRun.isBefore(now)) {
             nextRun = nextRun.plusWeeks(1); // now is a Monday after scheduled run time -> postpone
+        }
+        // Check if default TZ has daylight saving in effect by next run, need to adjust the hour offset in that case
+        if (!AppUtil.getDefaultTimeZone().isStandardOffset(nextRun.getMillis())) {
+            nextRun = nextRun.minusHours(1);
         }
 
         Logger.info("Scheduled next weekly report to be run at {}", nextRun.toString());
@@ -128,17 +127,15 @@ public class SystemInitializer {
                     .where()
                     .eq("roles.name", "TEACHER")
                     .findList();
-            try {
-                for (User teacher : teachers) {
-                    composer.composeWeeklySummary(teacher);
+            teachers.stream().forEach(t -> {
+                try {
+                    composer.composeWeeklySummary(t);
+                } catch (RuntimeException e) {
+                    Logger.error("Failed to send email for {}", t.getEmail());
                 }
-            } catch (IOException e) {
-                Logger.error("Failed to read email template from disk!", e);
-                e.printStackTrace();
-            } finally {
-                // Reschedule
-                scheduleWeeklyReport();
-            }
+            });
+            // Reschedule
+            scheduleWeeklyReport();
         }, actor.dispatcher());
     }
 

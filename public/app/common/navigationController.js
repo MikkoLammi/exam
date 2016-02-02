@@ -1,11 +1,15 @@
 (function () {
     'use strict';
     angular.module("exam.controllers")
-        .controller('NavigationCtrl', ['$scope', '$rootScope', '$modal', '$location', 'sessionService', 'waitingRoomService',
-            function ($scope, $rootScope, $modal, $location, sessionService, waitingRoomService) {
+        .controller('NavigationCtrl', ['$scope', '$rootScope', '$modal', '$location', 'sessionService', 'waitingRoomService', 'SettingsResource',
+            function ($scope, $rootScope, $modal, $location, sessionService, waitingRoomService, SettingsResource) {
 
                 $scope.isActive = function (link) {
                     return link.href === "#" + $location.path();
+                };
+
+                $scope.canDisplayFullNavbar = function() {
+                    return window.matchMedia("(min-width: 600px)").matches;
                 };
 
                 $scope.loggedOut = false;
@@ -16,6 +20,7 @@
 
                     if (!$scope.user || $scope.user.isLoggedOut) {
                         $scope.loggedOut = true;
+                        delete $scope.appVersion;
                         return [];
                     }
 
@@ -23,6 +28,13 @@
                     var admin = user.isAdmin || false;
                     var student = user.isStudent || false;
                     var teacher = user.isTeacher || false;
+                    var languageInspector = user.isTeacher && user.isLanguageInspector;
+
+                    if (admin) {
+                        SettingsResource.appVersion.get(function(data) {
+                            $scope.appVersion = data.appVersion;
+                        });
+                    }
 
                     // Do not show if waiting for exam to begin
                     var hideDashboard = (waitingRoomService.getEnrolmentId() || $scope.examStarted) && student;
@@ -33,6 +45,12 @@
                             visible: !hideDashboard,
                             class: "fa-home",
                             name: "sitnet_dashboard"
+                        },
+                        {
+                            href: "#/inspections",
+                            visible: (languageInspector),
+                            class: 'fa-language',
+                            name: "sitnet_language_inspections"
                         },
                         {
                             href: "#/questions",
@@ -61,7 +79,7 @@
                         {
                             href: "#/reports",
                             visible: (admin),
-                            class: "fa-file-word-o",
+                            class: "fa-files-o",
                             name: "sitnet_reports"
                         },
                         {

@@ -1,20 +1,11 @@
-/**
- * Created by mlupari on 20/03/15.
- */
 (function () {
     'use strict';
     angular.module('exam.services')
         .factory('questionService', ['$translate', '$location', 'QuestionRes', function ($translate, $location, QuestionRes) {
 
-            var createQuestion = function(type) {
-                var newQuestion;
-                newQuestion = {
-                    type: type,
-                    question: $translate.instant('sitnet_new_question_draft')
-                };
-
-                QuestionRes.questions.create(newQuestion,
-                    function(response) {
+            var createQuestion = function (type) {
+                QuestionRes.questions.create({type: type},
+                    function (response) {
                         toastr.info($translate.instant('sitnet_question_added'));
                         $location.path("/questions/" + response.id);
                     }
@@ -29,18 +20,7 @@
                 }, 0));
             };
 
-            var truncate = function (content, offset) {
-                if (content && content.indexOf("math-tex") === -1) {
-                    if (offset < content.length) {
-                        return content.substring(0, offset) + " ...";
-                    } else {
-                        return content;
-                    }
-                }
-                return content;
-            };
-
-            var decodeHtml = function(html) {
+            var decodeHtml = function (html) {
                 var txt = document.createElement("textarea");
                 txt.innerHTML = html;
                 return txt.value;
@@ -68,13 +48,37 @@
                 return text ? decodeHtml(text) : "";
             };
 
+            var _filter;
+
+            var setFilter = function (filter) {
+                switch (filter) {
+                    case "MultipleChoiceQuestion":
+                    case "WeightedMultipleChoiceQuestion":
+                    case "EssayQuestion":
+                        _filter = filter;
+                        break;
+                    default:
+                        _filter = undefined;
+                }
+            };
+
+            var applyFilter = function(questions) {
+                if (!_filter) {
+                    return questions;
+                }
+                return questions.filter(function(q) {
+                   return q.type === _filter;
+                });
+            };
+
             return {
                 createQuestion: createQuestion,
                 calculateMaxPoints: calculateMaxPoints,
-                truncate: truncate,
                 decodeHtml: decodeHtml,
                 longTextIfNotMath: longTextIfNotMath,
-                shortText: shortText
+                shortText: shortText,
+                setFilter: setFilter,
+                applyFilter: applyFilter
             };
 
         }]);

@@ -47,16 +47,20 @@
     width: 8.333333333333332%;
   }
   .newRow {
-    float:left;
-    clear:left;
+    float: left;
+    clear: left;
   }
+}
+
+.font-bold {
+  font-weight: bold;
 }
 
 .lightBorderBox {
   border: 1px solid #ddd;
   padding: 5px;
-  display: inline-block;
   width: 100%;
+  page-break-inside: avoid;
 }
 
 .main-header-row {
@@ -73,4 +77,13 @@
 .sub-content-row {
   margin-top: 0.25em;
   font-size: 1em;
+  word-wrap: break-word;
 }
+
+blockquote {
+  color: #999;
+  border: 0;
+  border-left: 2px solid #999;
+  padding-left: 1em;
+}
+

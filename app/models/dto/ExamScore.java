@@ -1,12 +1,21 @@
 package models.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import models.Exam;
+import models.ExamRecord;
 import models.GeneratedIdentityModel;
+import models.User;
 
 import javax.persistence.Entity;
+import javax.persistence.OneToOne;
+import javax.persistence.Transient;
 
 
 @Entity
 public class ExamScore extends GeneratedIdentityModel {
+
+    @OneToOne(mappedBy = "examScore")
+    private ExamRecord examRecord;
 
     private String studentId;
     private String student;
@@ -23,10 +32,14 @@ public class ExamScore extends GeneratedIdentityModel {
     private String creditType;
     private String lecturer;
     private String lecturerId;
-    private String date;
+    private String registrationDate;
     private String courseImplementation;
     private String additionalInfo;
     private String lecturerEmployeeNumber;
+
+    public ExamRecord getExamRecord() {
+        return examRecord;
+    }
 
     public String getCourseImplementation() {
         return courseImplementation;
@@ -84,12 +97,13 @@ public class ExamScore extends GeneratedIdentityModel {
         this.creditType = creditType;
     }
 
-    public String getDate() {
-        return date;
+    @JsonProperty("date")
+    public String getRegistrationDate() {
+        return registrationDate;
     }
 
-    public void setDate(String date) {
-        this.date = date;
+    public void setRegistrationDate(String registrationDate) {
+        this.registrationDate = registrationDate;
     }
 
     public String getExamDate() {
@@ -171,20 +185,33 @@ public class ExamScore extends GeneratedIdentityModel {
     public void setAdditionalInfo(String additionalInfo) {
         this.additionalInfo = additionalInfo;
     }
-    public String getLecturerEmployeeNumber() { return lecturerEmployeeNumber; }
 
-    public void setLecturerEmployeeNumber(String lecturerEmployeeNumber) { this.lecturerEmployeeNumber = lecturerEmployeeNumber; }
-
-    public static String[] getHeaders() {
-        return new String[]{"id", "studentId", "student", "identifier", "courseUnitCode", "examDate", "credits",
-                "creditLanguage", "studentGrade", "gradeScale", "courseUnitLevel", "courseUnitType", "creditType",
-                "lecturer", "lecturerId", "date", "courseImplementation", "additionalInfo", "lecturerEmployeeNumber"};
+    public String getLecturerEmployeeNumber() {
+        return lecturerEmployeeNumber;
     }
 
-    public String[] asArray() {
-        return new String[]{Long.toString(getId()), studentId, student, identifier, courseUnitCode, examDate, credits,
-                creditLanguage, studentGrade, gradeScale, courseUnitLevel, courseUnitType, creditType, lecturer,
-                lecturerId, date, courseImplementation, additionalInfo, lecturerEmployeeNumber};
+    public void setLecturerEmployeeNumber(String lecturerEmployeeNumber) {
+        this.lecturerEmployeeNumber = lecturerEmployeeNumber;
+    }
+
+    @Transient
+    public static String[] getHeaders() {
+        return new String[]{"id",
+                "student", "studentFirstName", "studentLastName", "studentEmail", "studentId", "identifier",
+                "courseUnitCode", "courseUnitName", "courseImplementation", "courseUnitLevel",
+                "examDate", "creditType", "credits", "creditLanguage", "studentGrade", "gradeScale", "examScore",
+                "lecturer", "lecturerFirstName", "lecturerLastName", "lecturerId", "lecturerEmployeeNumber",
+                "date", "additionalInfo"};
+    }
+
+    @Transient
+    public String[] asArray(User student, User teacher, Exam exam) {
+        return new String[]{Long.toString(getId()),
+                this.student, student.getFirstName(), student.getLastName(), student.getEmail(), studentId, identifier,
+                courseUnitCode, exam.getCourse().getName(), courseImplementation, courseUnitLevel,
+                examDate, creditType, credits, creditLanguage, studentGrade, gradeScale, examScore,
+                lecturer, teacher.getFirstName(), teacher.getLastName(), lecturerId, lecturerEmployeeNumber,
+                registrationDate, additionalInfo};
     }
 
 }

@@ -31,7 +31,7 @@ public class StudentExamControllerTest extends IntegrationTestCase {
     public void setUp() throws Exception {
         super.setUp();
         Ebean.delete(Ebean.find(ExamEnrolment.class).findList());
-        exam = Ebean.find(Exam.class).where().eq("state", Exam.State.PUBLISHED).findList().get(0);
+        exam = Ebean.find(Exam.class, 1);
         user = Ebean.find(User.class, userId);
         ExamRoom room = Ebean.find(ExamRoom.class, 1L);
         machine = room.getExamMachines().get(0);
@@ -100,6 +100,29 @@ public class StudentExamControllerTest extends IntegrationTestCase {
         result = request(Helpers.POST, String.format("/student/exams/%s/question/%d/option/%d", studentExam.getHash(),
                 question.getId(), option.getId()), null);
         assertThat(result.status()).isEqualTo(200);
+    }
+
+    @Test
+    @RunAsStudent
+    public void testAnswerMultiChoiceQuestionWrongIP() throws Exception {
+        // Setup
+        Result result = get("/student/doexam/" + exam.getHash());
+        JsonNode node = Json.parse(contentAsString(result));
+        Exam studentExam = deserialize(Exam.class, node);
+        Question question = Ebean.find(Question.class).where()
+                .eq("examSectionQuestion.examSection.exam", studentExam)
+                .eq("type", Question.Type.MultipleChoiceQuestion)
+                .findList()
+                .get(0);
+        MultipleChoiceOption option = question.getOptions().get(0);
+        // Change IP of reservation machine to simulate that student is on different machine now
+        machine.setIpAddress("127.0.0.2");
+        machine.update();
+
+        // Execute
+        result = request(Helpers.POST, String.format("/student/exams/%s/question/%d/option/%d", studentExam.getHash(),
+                question.getId(), option.getId()), null);
+        assertThat(result.status()).isEqualTo(403);
     }
 
 

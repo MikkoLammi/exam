@@ -10,6 +10,7 @@ import models.*;
 import org.joda.time.DateTime;
 import play.Logger;
 import play.libs.Json;
+import play.mvc.Http;
 import play.mvc.Result;
 import util.AppUtil;
 
@@ -17,13 +18,9 @@ import javax.mail.internet.AddressException;
 import javax.mail.internet.InternetAddress;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class SessionController extends BaseController {
-
-    private static final String LOGIN_TYPE = ConfigFactory.load().getString("sitnet.login");
 
     public Result login() {
         Result result;
@@ -41,8 +38,8 @@ public class SessionController extends BaseController {
     }
 
     private Result hakaLogin() {
-        String eppn = toUtf8(request().getHeader("eppn"));
-        if (eppn == null || eppn.isEmpty()) {
+        String eppn = parse(request().getHeader("eppn"));
+        if (eppn == null) {
             return badRequest("No credentials!");
         }
         User user = Ebean.find(User.class)
@@ -60,7 +57,7 @@ public class SessionController extends BaseController {
         }
         user.setLastLogin(new Date());
         user.save();
-        return createSession(toUtf8(request().getHeader("Shib-Session-ID")), user);
+        return createSession(user);
     }
 
     private Result devLogin() {
@@ -69,22 +66,22 @@ public class SessionController extends BaseController {
         if (credentials.getPassword() == null || credentials.getUsername() == null) {
             return unauthorized("sitnet_error_unauthenticated");
         }
-        String md5psswd = AppUtil.encodeMD5(credentials.getPassword());
+        String pwd = AppUtil.encodeMD5(credentials.getPassword());
         User user = Ebean.find(User.class)
                 .where().eq("eppn", credentials.getUsername() + "@funet.fi")
-                .eq("password", md5psswd).findUnique();
+                .eq("password", pwd).findUnique();
 
         if (user == null) {
             return unauthorized("sitnet_error_unauthenticated");
         }
         user.setLastLogin(new Date());
         user.save();
-        return createSession(UUID.randomUUID().toString(), user);
+        return createSession(user);
     }
 
     private static Language getLanguage(String code) {
         Language language = null;
-        if (code != null && !code.isEmpty()) {
+        if (code != null) {
             // for example: en-US -> en
             code = code.split("-")[0].toLowerCase();
             language = Ebean.find(Language.class, code);
@@ -96,14 +93,6 @@ public class SessionController extends BaseController {
         return language;
     }
 
-    private static Set<Role> parseRoles(String affiliation) throws NotFoundException {
-        Set<Role> roles = findRoles(affiliation);
-        if (roles.isEmpty()) {
-            throw new NotFoundException("sitnet_error_role_not_found " + affiliation);
-        }
-        return roles;
-    }
-
     private static String validateEmail(String email) throws AddressException {
         if (email == null) {
             throw new AddressException("no email address for user");
@@ -112,35 +101,59 @@ public class SessionController extends BaseController {
         return email;
     }
 
+    private static String parseUserIdentifier(String src) {
+        if (src == null) {
+            return null;
+        }
+        return src.substring(src.lastIndexOf(":") + 1);
+    }
+
+    private static String parseGivenName(Http.Request request) {
+        String givenName = parse(request.getHeader("givenName"));
+        if (givenName == null) {
+            String displayName = parse(request.getHeader("displayName"));
+            givenName = displayName.substring(displayName.lastIndexOf(" ") + 1);
+        }
+        return givenName;
+    }
+
+    private static Organisation findOrganisation(String attribute) {
+        if (attribute == null) {
+            return null;
+        }
+        return Ebean.find(Organisation.class).where().eq("code", attribute).findUnique();
+    }
+
     private static void updateUser(User user) throws AddressException {
-        user.setUserIdentifier(toUtf8(request().getHeader("schacPersonalUniqueCode")));
-        user.setEmail(validateEmail(toUtf8(request().getHeader("mail"))));
-        user.setLastName(toUtf8(request().getHeader("sn")));
-        user.setFirstName(toUtf8(request().getHeader("displayName")));
-        user.setEmployeeNumber(toUtf8(request().getHeader("employeeNumber")));
-        user.setLogoutUrl(toUtf8(request().getHeader("logouturl")));
+        user.setOrganisation(findOrganisation(parse(request().getHeader("homeOrganisation"))));
+        user.setUserIdentifier(parseUserIdentifier(parse(request().getHeader("schacPersonalUniqueCode"))));
+        user.setEmail(validateEmail(parse(request().getHeader("mail"))));
+        user.setLastName(parse(request().getHeader("sn")));
+        user.setFirstName(parseGivenName(request()));
+        user.setEmployeeNumber(parse(request().getHeader("employeeNumber")));
+        user.setLogoutUrl(parse(request().getHeader("logouturl")));
     }
 
     private static User createNewUser(String eppn) throws NotFoundException, AddressException {
         User user = new User();
-        user.getRoles().addAll(parseRoles(toUtf8(request().getHeader("unscoped-affiliation"))));
-        user.setLanguage(getLanguage(toUtf8(request().getHeader("preferredLanguage"))));
+        user.getRoles().addAll(parseRoles(parse(request().getHeader("unscoped-affiliation"))));
+        user.setLanguage(getLanguage(parse(request().getHeader("preferredLanguage"))));
         user.setEppn(eppn);
         updateUser(user);
         return user;
     }
 
-    private Result createSession(String token, User user) {
+    private Result createSession(User user) {
         Session session = new Session();
         session.setSince(DateTime.now());
         session.setUserId(user.getId());
         session.setValid(true);
-        session.setXsrfToken();
         // If user has just one role, set it as the one used for login
         if (user.getRoles().size() == 1) {
             session.setLoginRole(user.getRoles().get(0).getName());
         }
-        cache.set(SITNET_CACHE_KEY + token, session);
+
+        String token = createSession(session);
 
         ObjectNode result = Json.newObject();
         result.put("id", user.getId());
@@ -149,11 +162,9 @@ public class SessionController extends BaseController {
         result.put("lastname", user.getLastName());
         result.put("lang", user.getLanguage().getCode());
         result.set("roles", Json.toJson(user.getRoles()));
+        result.set("permissions", Json.toJson(user.getPermissions()));
         result.put("userAgreementAccepted", user.isUserAgreementAccepted());
         result.put("userIdentifier", user.getUserIdentifier());
-
-        response().setCookie("XSRF-TOKEN", session.getXsrfToken());
-
         return ok(result);
     }
 
@@ -169,76 +180,55 @@ public class SessionController extends BaseController {
         return ok(node);
     }
 
-    private static Set<Role> findRoles(String attribute) {
-        Map<String, List<String>> roleMapping = getRoleMapping();
+    private static Set<Role> parseRoles(String attribute) throws NotFoundException {
+        Map<Role, List<String>> roleMapping = getRoleMapping();
         Set<Role> userRoles = new HashSet<>();
         for (String affiliation : attribute.split(";")) {
-            if (roleMapping.get("STUDENT").contains(affiliation)) {
-                userRoles.add(Ebean.find(Role.class).where().eq("name", "STUDENT").findUnique());
-            } else if (roleMapping.get("TEACHER").contains(affiliation)) {
-                userRoles.add(Ebean.find(Role.class).where().eq("name", "TEACHER").findUnique());
-            } else if (roleMapping.get("ADMIN").contains(affiliation)) {
-                userRoles.add(Ebean.find(Role.class).where().eq("name", "ADMIN").findUnique());
+            for (Map.Entry<Role, List<String>> entry : roleMapping.entrySet()) {
+                if (entry.getValue().contains(affiliation)) {
+                    userRoles.add(entry.getKey());
+                    break;
+                }
             }
+        }
+        if (userRoles.isEmpty()) {
+            throw new NotFoundException("sitnet_error_role_not_found " + attribute);
         }
         return userRoles;
     }
 
-    static private Map<String, List<String>> getRoleMapping() {
-        String[] students = ConfigFactory.load().getString("sitnet.roles.student").split(",");
-        String[] teachers = ConfigFactory.load().getString("sitnet.roles.teacher").split(",");
-        String[] admins = ConfigFactory.load().getString("sitnet.roles.admin").split(",");
-
-        Map<String, List<String>> roles = new HashMap<>();
-
-        List<String> studentRoles = new ArrayList<>();
-        for (String student : students) {
-            studentRoles.add(student.trim());
-        }
-        roles.put("STUDENT", studentRoles);
-
-        List<String> teacherRoles = new ArrayList<>();
-        for (String teacher : teachers) {
-            teacherRoles.add(teacher.trim());
-        }
-        roles.put("TEACHER", teacherRoles);
-
-        List<String> adminRoles = new ArrayList<>();
-        for (String admin : admins) {
-            adminRoles.add(admin.trim());
-        }
-        roles.put("ADMIN", adminRoles);
-
+    static private Map<Role, List<String>> getRoleMapping() {
+        Role student = Ebean.find(Role.class).where().eq("name", Role.Name.STUDENT.toString()).findUnique();
+        Role teacher = Ebean.find(Role.class).where().eq("name", Role.Name.TEACHER.toString()).findUnique();
+        Role admin = Ebean.find(Role.class).where().eq("name", Role.Name.ADMIN.toString()).findUnique();
+        Map<Role, List<String>> roles = new HashMap<>();
+        roles.put(student, ConfigFactory.load().getStringList("sitnet.roles.student"));
+        roles.put(teacher, ConfigFactory.load().getStringList("sitnet.roles.teacher"));
+        roles.put(admin, ConfigFactory.load().getStringList("sitnet.roles.admin"));
         return roles;
     }
 
     public Result logout() {
-        response().discardCookie("XSRF-TOKEN");
-        String token = request().getHeader(SITNET_TOKEN_HEADER_KEY);
-        String key = SITNET_CACHE_KEY + token;
-        Session session = cache.get(key);
+        Session session = getSession();
+        Result result = ok();
         if (session != null) {
             User user = Ebean.find(User.class, session.getUserId());
-            if (LOGIN_TYPE.equals("HAKA")) {
-                session.setValid(false);
-                cache.set(key, session);
-                Logger.info("Set session as invalid {}", token);
-            } else {
-                cache.remove(key);
-            }
+            session.setValid(false);
+            updateSession(session);
+            Logger.info("Set session for user #{} as invalid", session.getUserId());
             if (user.getLogoutUrl() != null) {
                 ObjectNode node = Json.newObject();
                 node.put("logoutUrl", user.getLogoutUrl());
-                return ok(Json.toJson(node));
+                result = ok(Json.toJson(node));
             }
         }
-        return ok();
+        response().discardCookie("csrfToken");
+        session().clear();
+        return result;
     }
 
     public Result setLoginRole(Long uid, String roleName) {
-        String token = request().getHeader(LOGIN_TYPE.equals("HAKA") ? "Shib-Session-ID" : SITNET_TOKEN_HEADER_KEY);
-        final String key = SITNET_CACHE_KEY + token;
-        Session session = cache.get(key);
+        Session session = getSession();
         if (session == null) {
             return unauthorized();
         }
@@ -254,65 +244,42 @@ public class SessionController extends BaseController {
             return forbidden();
         }
         session.setLoginRole(roleName);
-        cache.set(SITNET_CACHE_KEY + token, session);
+        updateSession(session);
         return ok();
     }
 
 
     @Restrict({@Group("TEACHER"), @Group("ADMIN"), @Group("STUDENT")})
     public Result extendSession() {
-        String token = request().getHeader(LOGIN_TYPE.equals("HAKA") ? "Shib-Session-ID" : SITNET_TOKEN_HEADER_KEY);
-        final String key = SITNET_CACHE_KEY + token;
-        Session session = cache.get(key);
-
+        Session session = getSession();
         if (session == null) {
             return unauthorized();
         }
-
         session.setSince(DateTime.now());
-        cache.set(SITNET_CACHE_KEY + token, session);
-
+        updateSession(session);
         return ok();
     }
 
     public Result checkSession() {
-        String token = request().getHeader(LOGIN_TYPE.equals("HAKA") ? "Shib-Session-ID" : SITNET_TOKEN_HEADER_KEY);
-        final String key = SITNET_CACHE_KEY + token;
-        Session session = cache.get(key);
-
+        Session session = getSession();
         if (session == null || session.getSince() == null) {
             Logger.info("Session not found");
             return ok("no_session");
         }
-
-        final long timeOut = SITNET_TIMEOUT_MINUTES * 60 * 1000;
-        final long sessionTime = session.getSince().getMillis();
-        final long end = sessionTime + timeOut;
-        final long now = DateTime.now().getMillis();
-        final long alarmTime = end - (2 * 60 * 1000); // now - 2 minutes
-
-        if (Logger.isDebugEnabled()) {
-            DateFormat df = new SimpleDateFormat("HH:mm:ss");
-            Logger.debug(" - current time: " + df.format(now));
-            Logger.debug(" - session ends: " + df.format(end));
-        }
-
-        // session has 2 minutes left
-        if (now > alarmTime && now < end) {
-            return ok("alarm");
-        }
-
-        // session ended check
-        if (now > end) {
+        DateTime expirationTime = session.getSince().plusMinutes(SITNET_TIMEOUT_MINUTES);
+        DateTime alarmTime = expirationTime.minusMinutes(2);
+        Logger.debug("Session expiration due at {}", expirationTime);
+        if (expirationTime.isBeforeNow()) {
             Logger.info("Session has expired");
             return ok("no_session");
+        } else if (alarmTime.isBeforeNow()) {
+            return ok("alarm");
         }
-
         return ok();
     }
 
-    private static String toUtf8(String src) {
-        if (src == null) {
+    private static String parse(String src) {
+        if (src == null || src.isEmpty()) {
             return null;
         }
         try {

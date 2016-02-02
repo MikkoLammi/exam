@@ -1,8 +1,8 @@
 package models;
 
-import be.objectify.deadbolt.core.models.Permission;
 import be.objectify.deadbolt.core.models.Subject;
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
@@ -10,6 +10,7 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 import javax.persistence.*;
 import java.util.Date;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "app_user")
@@ -17,16 +18,15 @@ public class User extends GeneratedIdentityModel implements Subject {
 
     private String email;
 
-    // used identify user
     private String eppn;
 
-    // schacPersonalUniqueCode
     private String userIdentifier;
 
     private String lastName;
 
     private String firstName;
 
+    @JsonIgnore
     private String password;
 
     private String employeeNumber;
@@ -40,6 +40,9 @@ public class User extends GeneratedIdentityModel implements Subject {
 
     @ManyToMany(cascade = CascadeType.ALL)
     private List<Role> roles;
+
+    @ManyToMany(cascade = CascadeType.ALL)
+    private List<Permission> permissions;
 
     @ManyToOne
     @JoinColumn(name="language_id")
@@ -163,8 +166,8 @@ public class User extends GeneratedIdentityModel implements Subject {
     }
 
     @Override
-    public List<? extends Permission> getPermissions() {
-        return null;
+    public List<Permission> getPermissions() {
+        return permissions;
     }
 
     public List<ExamEnrolment> getEnrolments() {
@@ -212,13 +215,12 @@ public class User extends GeneratedIdentityModel implements Subject {
         this.lastLogin = lastLogin;
     }
 
-    public boolean hasRole(String name) {
+    public boolean hasRole(String name, Session session) {
+        return session != null && session.getLoginRole() != null && name.equals(session.getLoginRole());
+    }
 
-        for (Role role : roles) {
-            if (role.getName().equals(name))
-                return true;
-        }
-        return false;
+    public boolean hasPermission(Permission.Type type) {
+        return permissions.stream().map(Permission::getType).collect(Collectors.toList()).contains(type);
     }
 
     @Override

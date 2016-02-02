@@ -7,6 +7,7 @@ import models.Attachment;
 import models.ExamSectionQuestion;
 import models.OwnedModel;
 import models.Tag;
+import models.api.AttachmentContainer;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.springframework.beans.BeanUtils;
 
@@ -14,10 +15,12 @@ import javax.persistence.*;
 import java.util.List;
 
 @Entity
-public class Question extends OwnedModel {
+public class Question extends OwnedModel implements AttachmentContainer, Scorable {
 
     @EnumMapping(integerType = true, nameValuePairs = "MultipleChoiceQuestion=1, EssayQuestion=2, WeightedMultipleChoiceQuestion=3")
-    public enum Type { MultipleChoiceQuestion, EssayQuestion, WeightedMultipleChoiceQuestion }
+    public enum Type {
+        MultipleChoiceQuestion, EssayQuestion, WeightedMultipleChoiceQuestion
+    }
 
     @Column
     protected Type type;
@@ -32,10 +35,10 @@ public class Question extends OwnedModel {
 
     protected String state;
 
-    @Column(columnDefinition="numeric default 0")
+    @Column(columnDefinition = "numeric default 0")
     protected Double maxScore = 0.0;
 
-    @Column(columnDefinition="numeric default 0")
+    @Column(columnDefinition = "numeric default 0")
     protected Double evaluatedScore;
 
     @ManyToOne(cascade = CascadeType.PERSIST) // do not delete parent question
@@ -45,7 +48,7 @@ public class Question extends OwnedModel {
     @JsonBackReference
     protected List<Question> children;
 
-    @OneToOne (cascade = CascadeType.ALL)
+    @OneToOne(cascade = CascadeType.ALL)
     protected Answer answer;
 
     @Column(columnDefinition = "TEXT")
@@ -59,7 +62,7 @@ public class Question extends OwnedModel {
     protected Attachment attachment;
 
     // In UI, section has been expanded
-    @Column(columnDefinition="boolean default false")
+    @Column(columnDefinition = "boolean default false")
     protected boolean expanded;
 
     // not really max length, Just a recommendation
@@ -77,13 +80,17 @@ public class Question extends OwnedModel {
     protected List<Tag> tags;
 
 
-    public String getState() { return state; }
+    public String getState() {
+        return state;
+    }
 
     public void setState(String state) {
         this.state = state;
     }
 
-    public Type getType() { return type; }
+    public Type getType() {
+        return type;
+    }
 
     public void setType(Type type) {
         this.type = type;
@@ -137,10 +144,12 @@ public class Question extends OwnedModel {
         this.evaluationCriterias = evaluationCriterias;
     }
 
+    @Override
     public Attachment getAttachment() {
         return attachment;
     }
 
+    @Override
     public void setAttachment(Attachment attachment) {
         this.attachment = attachment;
     }
@@ -217,6 +226,104 @@ public class Question extends OwnedModel {
         this.tags = tags;
     }
 
+    @Transient
+    @Override
+    public Double getAssessedScore() {
+        switch (type) {
+            case EssayQuestion:
+                if (evaluationType != null && evaluationType.equals("Points")) {
+                    return evaluatedScore;
+                }
+                break;
+            case MultipleChoiceQuestion:
+                if (answer != null) {
+                    return answer.getOptions().get(0).isCorrectOption() ? maxScore : 0.0;
+                }
+                break;
+            case WeightedMultipleChoiceQuestion:
+                if (answer != null) {
+                    Double evaluation = answer.getOptions().stream()
+                            .map(MultipleChoiceOption::getScore)
+                            .reduce(0.0, (sum, x) -> sum += x);
+                    // ATM minimum score is zero
+                    return Math.max(0.0, evaluation);
+                }
+                break;
+        }
+        return 0.0;
+    }
+
+    @Transient
+    @Override
+    public Double getMaxAssessedScore() {
+        switch (type) {
+            case EssayQuestion:
+                if (evaluationType != null && evaluationType.equals("Points")) {
+                    return maxScore;
+                }
+                break;
+            case MultipleChoiceQuestion:
+                return maxScore;
+            case WeightedMultipleChoiceQuestion:
+                return options.stream()
+                        .map(MultipleChoiceOption::getScore)
+                        .filter(o -> o > 0)
+                        .reduce(0.0, (sum, x) -> sum += x);
+        }
+        return 0.0;
+    }
+
+    @Transient
+    @Override
+    public boolean isRejected() {
+        return type == Type.EssayQuestion &&
+                evaluationType != null &&
+                evaluationType.equals("Select")
+                && evaluatedScore != null
+                && evaluatedScore == 0;
+    }
+
+    @Transient
+    @Override
+    public boolean isApproved() {
+        return type == Type.EssayQuestion &&
+                evaluationType != null &&
+                evaluationType.equals("Select")
+                && evaluatedScore != null
+                && evaluatedScore == 1;
+    }
+
+    @Transient
+    @Override
+    public String validate() {
+        String reason = null;
+        switch (type) {
+            case EssayQuestion:
+                break;
+            case MultipleChoiceQuestion:
+                if (options.size() < 2) {
+                    reason = "sitnet_minimum_of_two_options_required";
+                }
+                else if (!hasCorrectOption()) {
+                    reason = "sitnet_correct_option_required";
+                }
+                break;
+            case WeightedMultipleChoiceQuestion:
+                if (options.size() < 2) {
+                    reason = "sitnet_minimum_of_two_options_required";
+                }
+                break;
+            default:
+                reason = "unknown question type";
+        }
+        return reason;
+    }
+
+    @Transient
+    public boolean hasCorrectOption() {
+        return options.stream().anyMatch(MultipleChoiceOption::isCorrectOption);
+    }
+
     @Override
     public boolean equals(Object object) {
         if (this == object) {
@@ -225,11 +332,11 @@ public class Question extends OwnedModel {
         if (!(object instanceof Question)) {
             return false;
         }
-        Question other = (Question)object;
+        Question other = (Question) object;
         return new EqualsBuilder().append(id, other.getId()).build();
     }
 
-	public Question copy() {
+    public Question copy() {
         Question question = new Question();
         BeanUtils.copyProperties(this, question, "id", "answer", "options", "tags", "children");
         question.setParent(this);
@@ -244,7 +351,7 @@ public class Question extends OwnedModel {
         return question;
     }
 
-   	@Override
+    @Override
     public String toString() {
         return "Question [type=" + type
                 + ", id=" + id + "]";

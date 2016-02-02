@@ -36,6 +36,10 @@ public class ExamControllerTest extends IntegrationTestCase {
         // Setup
         List<Exam> activeExams = Ebean.find(Exam.class).where()
                 .eq("creator.id", userId).eq("state", Exam.State.PUBLISHED).findList();
+        activeExams.stream().forEach(e -> {
+            e.getExamOwners().add(e.getCreator());
+            e.update();
+        });
         Set<Long> ids = new HashSet<>();
         for (Exam e : activeExams) {
             e.setExamActiveStartDate(new Date());
@@ -161,7 +165,7 @@ public class ExamControllerTest extends IntegrationTestCase {
     }
 
     private String[] getExamSectionFieldsOfExam(String index) {
-        String[] fields = {"name", "totalScore", "id", "expanded", "lotteryOn", "lotteryItemCount"};
+        String[] fields = {"name", "id", "expanded", "lotteryOn", "lotteryItemCount"};
         for (int i = 0; i < fields.length; ++i) {
             fields[i] = "examSections[" + index + "]." + fields[i];
         }
