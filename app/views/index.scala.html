@@ -196,16 +196,14 @@
                 <div class="nav-container">
                     <div ng-class="minimizeNavigation ? 'minimize' : ''">
                         <div class="nav-header">
-                            @* HY: exam logo removed from navbar
-                                <div class="logo">
-                                    <div ng-hide="minimizeNavigation">
-                                        <img src="@routes.Assets.at("assets/images/exam-logo-black-small.png")" alt="exam" />
-                                    </div>
-                                    <div ng-hide="!minimizeNavigation">
-                                        <img width="50" height="90" src="@routes.Assets.at("assets/images/exam-logo-black-small-v.png")" alt="exam" />
-                                    </div>
+                            <div class="logo">
+                                <div ng-hide="minimizeNavigation">
+                                    <img src="@routes.Assets.at("assets/images/exam-logo-black-small.png")" alt="exam" />
                                 </div>
-                            *@
+                                <div ng-hide="!minimizeNavigation">
+                                    <img width="50" height="90" src="@routes.Assets.at("assets/images/exam-logo-black-small-v.png")" alt="exam" />
+                                </div>
+                            </div>
                                 @*Version number*@
                             <div ng-hide="minimizeNavigation || !appVersion" >
                                 <div class="app-version">

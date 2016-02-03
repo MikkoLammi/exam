@@ -16,14 +16,9 @@
     color: $sitnet-dark-grey;
   }
 
-  .logo {
-    padding: 0;
-    width: 100%;
-
-    img {
-      display: block;
-      margin: auto;
-    }
+  .logo { // HY-CUSTOMIZATION
+    visibility: hidden;
+    height: 0;
   }
 
   nav a {
