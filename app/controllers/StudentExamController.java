@@ -120,7 +120,8 @@ public class StudentExamController extends BaseController {
         exam.setApprovedAnswerCount();
         exam.setRejectedAnswerCount();
         exam.setTotalScore();
-        return ok(exam);
+        PathProperties pp = PathProperties.parse("(*)");
+        return ok(exam, pp);
     }
 
     @Restrict({@Group("STUDENT")})
@@ -510,7 +511,8 @@ public class StudentExamController extends BaseController {
                 o.setAnswered(optionIds.contains(o.getId()));
                 o.update();
             });
-            return ok(Json.toJson(question.getOptions()));
+            PathProperties pp = PathProperties.parse("(id, answered, option(id, option))");
+            return ok(question.getOptions(), pp);
         });
     }
 
@@ -555,11 +557,12 @@ public class StudentExamController extends BaseController {
             GradeEvaluation ge = it.next();
             int threshold = 0;
             if (ge.getPercentage() > percentage) {
+                // Grade falls short of threshold
                 grade = prev == null ? ge.getGrade() : prev.getGrade();
                 threshold = prev == null ? ge.getPercentage() : prev.getPercentage();
             }
-            if (!it.hasNext()) {
-                // Highest possible grade
+            else if (!it.hasNext()) {
+                // Top grade
                 grade = ge.getGrade();
                 threshold = ge.getPercentage();
             }
