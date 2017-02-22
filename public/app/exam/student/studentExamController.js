@@ -259,7 +259,7 @@
                     }
                     $scope.previousButton = {valid: true};
                     if (previousPage !== 'guide') {
-                        $scope.previousButton.text = findSection(sectionId).name;
+                        $scope.previousButton.text = findSection(previousPage).name;
                         return;
                     }
                     $scope.previousButton.isGuide = true;
@@ -456,7 +456,7 @@
                         window.onbeforeunload = null;
                         $location.path("/student/logout/finished");
                     }, function (error) {
-                        toastr.error($translate.instant(error));
+                        toastr.error($translate.instant(error.data));
                     });
                 };
 
