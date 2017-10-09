@@ -322,7 +322,6 @@ public class RoomController extends BaseController {
 
         if (!ids.isEmpty()) {
             for (String aid : ids) {
-                System.out.println(aid);
                 int accessibilityId;
                 try {
                     accessibilityId = Integer.parseInt(aid.trim());
