@@ -30,6 +30,10 @@ public class RoomControllerTest extends IntegrationTestCase {
         assertThat(result.status()).isEqualTo(200);
 
         // Verify (both response and database)
+        JsonNode node = Json.parse(contentAsString(result));
+        ExamRoom deserialized = deserialize(ExamRoom.class, node);
+        assertThat(deserialized.getState()).isEqualTo(ExamRoom.State.INACTIVE.toString());
+
         room = Ebean.find(ExamRoom.class, 1L);
         assertThat(room.getState()).isEqualTo(ExamRoom.State.INACTIVE.toString());
     }
@@ -66,6 +70,10 @@ public class RoomControllerTest extends IntegrationTestCase {
         assertThat(result.status()).isEqualTo(200);
 
         // Verify (both response and database)
+        JsonNode node = Json.parse(contentAsString(result));
+        ExamRoom deserialized = deserialize(ExamRoom.class, node);
+        assertThat(deserialized.getState()).isEqualTo(ExamRoom.State.ACTIVE.toString());
+
         room = Ebean.find(ExamRoom.class, 1L);
         assertThat(room.getState()).isEqualTo(ExamRoom.State.ACTIVE.toString());
     }
