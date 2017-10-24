@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   version="1.1"
+   width="78.000046"
+   height="40"
+   id="svg2"
+   xml:space="preserve"><metadata
+     id="metadata8"><rdf:RDF><cc:Work
+         rdf:about=""><dc:format>image/svg+xml</dc:format><dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" /><dc:title></dc:title></cc:Work></rdf:RDF></metadata><defs
+     id="defs6"><clipPath
+       id="clipPath20"><path
+         d="m 0,254.001 269.136,0 L 269.136,0 0,0 Z"
+         id="path22" /></clipPath><clipPath
+       id="clipPath20-1"><path
+         d="m 0,254.001 269.136,0 L 269.136,0 0,0 Z"
+         id="path22-2" /></clipPath></defs><g
+     id="g5917"
+     transform="translate(626.153,-2083.2998)"><rect
+       style="opacity:0;fill:#000000;fill-opacity:1;stroke:none"
+       id="rect4864"
+       width="78"
+       height="40"
+       x="-626.15295"
+       y="2083.2998" /><text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:5.41174889px;line-height:1000%;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       x="-627.12543"
+       y="2107.126"
+       id="text4182-3"><tspan
+         id="tspan4184-6"
+         x="-627.12543"
+         y="2107.126"
+         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:10.82349777px;font-family:'Open Sans';-inkscape-font-specification:'Open Sans Bold';fill:#ffffff">EXAMINARIUM</tspan></text>
+</g></svg>
