@@ -60,6 +60,8 @@ public class ClozeTestAnswer extends GeneratedIdentityModel {
             b.attr("class", "cloze-input");
             if (isNumeric) {
                 b.attr("step", "any");
+                // Should allow for using both comma and period as decimal separator
+                b.attr( "lang", "en-150");
             }
         });
         this.question = doc.body().children().toString();
@@ -150,7 +152,10 @@ public class ClozeTestAnswer extends GeneratedIdentityModel {
         }
         // Get rid of excess whitespace
         answer = answer.trim().replaceAll(" +", " ");
-        String correctAnswer = blank.text().trim().replaceAll(" +", " ");
+        String correctAnswer = blank.text().trim()
+                .replaceAll(" +", " ")
+                .replaceAll(" \\|", "|")
+                .replaceAll("\\| ", "|");
         // Generate the regex pattern. Replace '*' with '.*' and put the whole
         // thing in braces if there's a '|'.
         // For escaped '\*' and '\|' we have to first replace occurrences with special
