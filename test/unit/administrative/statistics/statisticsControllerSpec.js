@@ -45,8 +45,8 @@ describe('StatisticsController', function () {
     it('should have load participation statistics', function () {
         $httpBackend.expectGET(/\/app\/reports\/participations\?end=[\w:+^&]/)
             .respond(readFixtures('participations.json'));
-        ctrl.endDate = 'Tue Mar 01 2016 12:00:00 GMT';
-        ctrl.listParticipations();
+        scope.dateService.endDate = 'Tue Mar 01 2016 12:00:00 GMT';
+        scope.listParticipations();
         $httpBackend.flush();
 
         // Check participations
@@ -55,10 +55,10 @@ describe('StatisticsController', function () {
         expect(Object.keys(scope.participations).length > 0).toBeTruthy();
 
         // Check min and max date
-        console.info('Min date: ' + new Date(ctrl.minDate));
-        expect(ctrl.minDate).toEqual(1449493200134);
-        console.info('Max date: ' + new Date(ctrl.maxDate));
-        expect(ctrl.maxDate).toEqual(1456833600000);
+        console.info('Min date: ' + new Date(scope.minDate));
+        expect(scope.minDate).toEqual(1449493200134);
+        console.info('Max date: ' + new Date(scope.maxDate));
+        expect(scope.maxDate).toEqual(1456833600000);
 
         // Check months
         expect(scope.months.length).toEqual(4);
